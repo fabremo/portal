@@ -50,6 +50,18 @@ export default function SalesReportLoading() {
           ))}
         </div>
       </article>
+
+      <article className="overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white shadow-card">
+        <div className="border-b border-gray-200 px-6 py-5">
+          <h3 className="text-xl font-semibold">Preparando tabela por anuncio</h3>
+        </div>
+
+        <div className="space-y-3 px-6 py-6">
+          {[1, 2, 3, 4].map((item) => (
+            <div className="h-12 animate-pulse rounded-2xl bg-background" key={item} />
+          ))}
+        </div>
+      </article>
     </section>
   );
 }

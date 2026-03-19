@@ -1,6 +1,7 @@
-import { BellDot } from "lucide-react";
+import { BellDot, DollarSign, ShoppingBag } from "lucide-react";
 
 import { getDashboardAccessContext } from "@/lib/dashboard/access";
+import { getFacebookSalesOverviewSummary } from "@/lib/facebook/sales-report";
 import { getFacebookAccountStatus } from "@/lib/facebook/status";
 
 const toneStyles = {
@@ -10,6 +11,21 @@ const toneStyles = {
   warning: "border-amber-200 bg-amber-50 text-amber-700",
 } as const;
 
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    currency: "BRL",
+    style: "currency",
+  }).format(value);
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("pt-BR").format(new Date(`${value}T00:00:00`));
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("pt-BR").format(value);
+}
+
 export default async function DashboardPage() {
   const accessContext = await getDashboardAccessContext();
 
@@ -17,13 +33,20 @@ export default async function DashboardPage() {
     return null;
   }
 
-  const facebookStatus = await getFacebookAccountStatus(accessContext.activeAdAccount.id);
+  const [facebookStatus, salesOverviewSummary] = await Promise.all([
+    getFacebookAccountStatus(accessContext.activeAdAccount.id),
+    getFacebookSalesOverviewSummary(accessContext.activeAdAccount.id),
+  ]);
+
   const lastCheckedAt = new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(facebookStatus.lastCheckedAt));
   const shouldShowRawStatusCode =
     facebookStatus.statusTone === "warning" || facebookStatus.statusTone === "danger";
+  const dateRangeLabel = `${formatDate(salesOverviewSummary.since)} a ${formatDate(salesOverviewSummary.until)}`;
+  const shouldShowSalesError =
+    salesOverviewSummary.state === "not_configured" || salesOverviewSummary.state === "error";
 
   return (
     <section className="space-y-6">
@@ -43,6 +66,9 @@ export default async function DashboardPage() {
               <p className="mt-1 text-sm text-ink/70">
                 Conta ativa:{" "}
                 <span className="font-medium text-ink">{accessContext.activeAdAccount.name}</span>
+              </p>
+              <p className="mt-1 text-sm text-ink/70">
+                Intervalo utilizado: <span className="font-medium text-ink">{dateRangeLabel}</span>
               </p>
             </div>
           </div>
@@ -69,6 +95,60 @@ export default async function DashboardPage() {
           </div>
         </div>
       </header>
+
+      <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+        <article className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-card md:p-7">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ink/55">
+                Total de purchases
+              </p>
+              {salesOverviewSummary.state === "ok" || salesOverviewSummary.state === "empty" ? (
+                <p className="mt-4 text-4xl font-semibold text-ink">
+                  {formatNumber(salesOverviewSummary.totalPurchases)}
+                </p>
+              ) : (
+                <p className="mt-4 text-2xl font-semibold text-ink">Indisponivel</p>
+              )}
+            </div>
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+              <ShoppingBag className="h-5 w-5" />
+            </span>
+          </div>
+
+          {shouldShowSalesError ? (
+            <div className="mt-5 text-sm text-ink/70">
+              <p>{salesOverviewSummary.message}</p>
+            </div>
+          ) : null}
+        </article>
+
+        <article className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-card md:p-7">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ink/55">
+                Total investido
+              </p>
+              {salesOverviewSummary.state === "ok" || salesOverviewSummary.state === "empty" ? (
+                <p className="mt-4 text-4xl font-semibold text-ink">
+                  {formatCurrency(salesOverviewSummary.totalAmountSpent)}
+                </p>
+              ) : (
+                <p className="mt-4 text-2xl font-semibold text-ink">Indisponivel</p>
+              )}
+            </div>
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+              <DollarSign className="h-5 w-5" />
+            </span>
+          </div>
+
+          {shouldShowSalesError ? (
+            <div className="mt-5 text-sm text-ink/70">
+              <p>{salesOverviewSummary.message}</p>
+            </div>
+          ) : null}
+        </article>
+      </section>
     </section>
   );
 }

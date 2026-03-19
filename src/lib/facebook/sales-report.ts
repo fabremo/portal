@@ -3,9 +3,7 @@ import "server-only";
 const META_GRAPH_VERSION = "v25.0";
 const SALES_CAMPAIGN_TAG = "[VENDAS]";
 
-const PURCHASE_ACTION_TYPES = [
-  "purchase",
-] as const;
+const PURCHASE_ACTION_TYPES = ["purchase"] as const;
 
 type MetaAction = {
   action_type?: string;
@@ -28,11 +26,15 @@ type MetaCampaignResponse = {
 };
 
 type MetaInsightRow = {
+  ad_id?: string;
+  ad_name?: string;
   action_values?: MetaAction[];
   actions?: MetaAction[];
   campaign_id?: string;
   campaign_name?: string;
   date_start?: string;
+  impressions?: string;
+  inline_link_clicks?: string;
   spend?: string;
 };
 
@@ -63,8 +65,18 @@ export type FacebookSalesDailyRow = {
   roas: number | null;
 };
 
+export type FacebookSalesAdRow = {
+  adName: string;
+  amountSpent: number;
+  costPerLinkClick: number | null;
+  costPerPurchase: number | null;
+  linkCtr: number | null;
+  purchases: number;
+};
+
 export type FacebookSalesReportResult =
   | {
+      adRows: [];
       dailyRows: [];
       lastCheckedAt: string;
       message: string;
@@ -74,11 +86,31 @@ export type FacebookSalesReportResult =
       until: string;
     }
   | {
+      adRows: FacebookSalesAdRow[];
       dailyRows: FacebookSalesDailyRow[];
       lastCheckedAt: string;
       rows: FacebookSalesRow[];
       since: string;
       state: "empty" | "ok";
+      until: string;
+    };
+
+export type FacebookSalesOverviewSummary =
+  | {
+      lastCheckedAt: string;
+      message: string;
+      since: string;
+      state: "not_configured" | "not_found" | "error";
+      totalAmountSpent: null;
+      totalPurchases: null;
+      until: string;
+    }
+  | {
+      lastCheckedAt: string;
+      since: string;
+      state: "empty" | "ok";
+      totalAmountSpent: number;
+      totalPurchases: number;
       until: string;
     };
 
@@ -187,6 +219,70 @@ function buildDailyRows(rows: MetaInsightRow[]) {
   );
 }
 
+function buildAdRows(rows: MetaInsightRow[]) {
+  const groupedRows = new Map<
+    string,
+    {
+      adName: string;
+      amountSpent: number;
+      impressions: number;
+      linkClicks: number;
+      purchases: number;
+    }
+  >();
+
+  for (const row of rows) {
+    const adName = row.ad_name?.trim();
+
+    if (!adName) {
+      continue;
+    }
+
+    const amountSpent = parseNumber(row.spend);
+    const impressions = parseNumber(row.impressions);
+    const linkClicks = parseNumber(row.inline_link_clicks);
+    const purchases = extractPurchaseCount(row.actions);
+    const existingRow = groupedRows.get(adName);
+
+    if (!existingRow) {
+      groupedRows.set(adName, {
+        adName,
+        amountSpent,
+        impressions,
+        linkClicks,
+        purchases,
+      });
+      continue;
+    }
+
+    existingRow.amountSpent += amountSpent;
+    existingRow.impressions += impressions;
+    existingRow.linkClicks += linkClicks;
+    existingRow.purchases += purchases;
+  }
+
+  return Array.from(groupedRows.values())
+    .map((row) => ({
+      adName: row.adName,
+      amountSpent: row.amountSpent,
+      costPerLinkClick: row.linkClicks > 0 ? row.amountSpent / row.linkClicks : null,
+      costPerPurchase: row.purchases > 0 ? row.amountSpent / row.purchases : null,
+      linkCtr: row.impressions > 0 ? (row.linkClicks / row.impressions) * 100 : null,
+      purchases: row.purchases,
+    }))
+    .sort((left, right) => {
+      if (right.purchases !== left.purchases) {
+        return right.purchases - left.purchases;
+      }
+
+      if (right.amountSpent !== left.amountSpent) {
+        return right.amountSpent - left.amountSpent;
+      }
+
+      return left.adName.localeCompare(right.adName, "pt-BR");
+    });
+}
+
 async function fetchMetaJson<T>(url: string) {
   const response = await fetch(url, {
     cache: "no-store",
@@ -290,6 +386,36 @@ async function fetchDailySalesInsights(
   return buildDailyRows(rows);
 }
 
+async function fetchAdSalesInsights(
+  accessToken: string,
+  adAccountId: string,
+  since: string,
+  until: string
+) {
+  let nextUrl =
+    `https://graph.facebook.com/${META_GRAPH_VERSION}/${adAccountId}/insights?` +
+    new URLSearchParams({
+      access_token: accessToken,
+      fields: "ad_id,ad_name,campaign_id,campaign_name,spend,impressions,inline_link_clicks,actions",
+      level: "ad",
+      time_increment: "all_days",
+      time_range: JSON.stringify({ since, until }),
+    }).toString();
+
+  const rows: MetaInsightRow[] = [];
+
+  while (nextUrl) {
+    const payload = await fetchMetaJson<MetaInsightResponse>(nextUrl);
+    const matchingRows =
+      payload.data?.filter((row) => row.campaign_name?.includes(SALES_CAMPAIGN_TAG)) ?? [];
+
+    rows.push(...matchingRows);
+    nextUrl = payload.paging?.next ?? "";
+  }
+
+  return buildAdRows(rows);
+}
+
 export async function getFacebookSalesReport(
   adAccountId: string
 ): Promise<FacebookSalesReportResult> {
@@ -299,6 +425,7 @@ export async function getFacebookSalesReport(
 
   if (!accessToken) {
     return {
+      adRows: [],
       dailyRows: [],
       lastCheckedAt,
       message: "Defina FACEBOOK_ACCESS_TOKEN para habilitar o relatorio de Vendas.",
@@ -314,6 +441,7 @@ export async function getFacebookSalesReport(
 
     if (!campaigns.length) {
       return {
+        adRows: [],
         dailyRows: [],
         lastCheckedAt,
         message: "Nao ha campanha com [VENDAS] na conta de anuncios selecionada.",
@@ -324,11 +452,12 @@ export async function getFacebookSalesReport(
       };
     }
 
-    const [rows, dailyRows] = await Promise.all([
+    const [rows, dailyRows, adRows] = await Promise.all([
       Promise.all(
         campaigns.map((campaign) => fetchCampaignSalesInsight(accessToken, campaign, since, until))
       ),
       fetchDailySalesInsights(accessToken, adAccountId, since, until),
+      fetchAdSalesInsights(accessToken, adAccountId, since, until),
     ]);
 
     const campaignRows = rows
@@ -337,6 +466,7 @@ export async function getFacebookSalesReport(
 
     if (!campaignRows.length) {
       return {
+        adRows: [],
         dailyRows: [],
         lastCheckedAt,
         rows: [],
@@ -347,6 +477,7 @@ export async function getFacebookSalesReport(
     }
 
     return {
+      adRows,
       dailyRows,
       lastCheckedAt,
       rows: campaignRows,
@@ -356,6 +487,7 @@ export async function getFacebookSalesReport(
     };
   } catch (error) {
     return {
+      adRows: [],
       dailyRows: [],
       lastCheckedAt,
       message:
@@ -367,5 +499,46 @@ export async function getFacebookSalesReport(
       state: "error",
       until,
     };
+  }
+}
+
+export async function getFacebookSalesOverviewSummary(
+  adAccountId: string
+): Promise<FacebookSalesOverviewSummary> {
+  const report = await getFacebookSalesReport(adAccountId);
+
+  switch (report.state) {
+    case "ok": {
+      const totalPurchases = report.rows.reduce((total, row) => total + row.purchases, 0);
+      const totalAmountSpent = report.rows.reduce((total, row) => total + row.amountSpent, 0);
+
+      return {
+        lastCheckedAt: report.lastCheckedAt,
+        since: report.since,
+        state: "ok",
+        totalAmountSpent,
+        totalPurchases,
+        until: report.until,
+      };
+    }
+    case "empty":
+      return {
+        lastCheckedAt: report.lastCheckedAt,
+        since: report.since,
+        state: "empty",
+        totalAmountSpent: 0,
+        totalPurchases: 0,
+        until: report.until,
+      };
+    default:
+      return {
+        lastCheckedAt: report.lastCheckedAt,
+        message: report.message,
+        since: report.since,
+        state: report.state,
+        totalAmountSpent: null,
+        totalPurchases: null,
+        until: report.until,
+      };
   }
 }

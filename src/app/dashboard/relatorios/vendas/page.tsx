@@ -18,6 +18,17 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat("pt-BR").format(value);
 }
 
+function formatPercent(value: number | null) {
+  if (value === null) {
+    return "-";
+  }
+
+  return `${new Intl.NumberFormat("pt-BR", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+  }).format(value)}%`;
+}
+
 function formatRoas(value: number | null) {
   if (value === null) {
     return "-";
@@ -151,6 +162,48 @@ export default async function SalesReportPage() {
                       <td className="px-6 py-4">{formatNumber(row.purchases)}</td>
                       <td className="px-6 py-4">{formatCurrency(row.purchaseValue)}</td>
                       <td className="px-6 py-4">{formatRoas(row.roas)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article className="overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white shadow-card">
+            <div className="border-b border-gray-200 px-6 py-5">
+              <h3 className="text-xl font-semibold">Tabela por anuncio</h3>
+              <p className="mt-2 text-sm">
+                Consolide os anuncios pelo nome e priorize os que mais geraram compras no periodo.
+              </p>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-background text-left text-ink">
+                  <tr>
+                    <th className="px-6 py-4 font-semibold">Nome do anuncio</th>
+                    <th className="px-6 py-4 font-semibold">Custo</th>
+                    <th className="px-6 py-4 font-semibold">Compra</th>
+                    <th className="px-6 py-4 font-semibold">CTR% do link</th>
+                    <th className="px-6 py-4 font-semibold">CPC link</th>
+                    <th className="px-6 py-4 font-semibold">Custo por compra</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {report.adRows.map((row) => (
+                    <tr className="align-top" key={row.adName}>
+                      <td className="px-6 py-4">
+                        <p className="font-medium text-ink">{row.adName}</p>
+                      </td>
+                      <td className="px-6 py-4">{formatCurrency(row.amountSpent)}</td>
+                      <td className="px-6 py-4">{formatNumber(row.purchases)}</td>
+                      <td className="px-6 py-4">{formatPercent(row.linkCtr)}</td>
+                      <td className="px-6 py-4">
+                        {row.costPerLinkClick === null ? "-" : formatCurrency(row.costPerLinkClick)}
+                      </td>
+                      <td className="px-6 py-4">
+                        {row.costPerPurchase === null ? "-" : formatCurrency(row.costPerPurchase)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
