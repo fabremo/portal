@@ -1,7 +1,7 @@
 import "server-only";
 
 const META_GRAPH_VERSION = "v25.0";
-const META_MESSAGES_CAMPAIGN_NAME = "[ENGAJAMENTO] [WHATS] [IVAN] [REGULAR]";
+const MESSAGES_CAMPAIGN_TAG = "[WHATS]";
 
 type MetaAction = {
   action_type?: string;
@@ -25,8 +25,8 @@ type MetaCampaignResponse = {
 
 type MetaInsightRow = {
   actions?: MetaAction[];
-  ad_id?: string;
-  ad_name?: string;
+  campaign_id?: string;
+  campaign_name?: string;
   impressions?: string;
   inline_link_clicks?: string;
   spend?: string;
@@ -39,10 +39,10 @@ type MetaInsightResponse = {
   };
 };
 
-export type FacebookMessagesRow = {
-  adId: string;
-  adName: string;
+export type FacebookMessagesCampaignRow = {
   amountSpent: number;
+  campaignId: string;
+  campaignName: string;
   costPerLinkClick: number | null;
   costPerStartedMessage: number | null;
   impressions: number;
@@ -53,7 +53,7 @@ export type FacebookMessagesRow = {
 
 export type FacebookMessagesReportResult =
   | {
-      campaignName: string;
+      campaignLabel: string;
       lastCheckedAt: string;
       message: string;
       rows: [];
@@ -62,10 +62,9 @@ export type FacebookMessagesReportResult =
       until: string;
     }
   | {
-      campaignId: string;
-      campaignName: string;
+      campaignLabel: string;
       lastCheckedAt: string;
-      rows: FacebookMessagesRow[];
+      rows: FacebookMessagesCampaignRow[];
       since: string;
       state: "empty" | "ok";
       until: string;
@@ -112,37 +111,6 @@ function extractStartedMessages(actions?: MetaAction[]) {
   return parseNumber(match?.value);
 }
 
-function getAdGroupKey(row: Pick<FacebookMessagesRow, "adName">) {
-  return row.adName.trim().toLocaleLowerCase("pt-BR");
-}
-
-function aggregateRowsByAd(rows: FacebookMessagesRow[]) {
-  const groupedRows = new Map<string, FacebookMessagesRow>();
-
-  for (const row of rows) {
-    const groupKey = getAdGroupKey(row);
-    const existingRow = groupedRows.get(groupKey);
-
-    if (!existingRow) {
-      groupedRows.set(groupKey, { ...row });
-      continue;
-    }
-
-    existingRow.amountSpent += row.amountSpent;
-    existingRow.impressions += row.impressions;
-    existingRow.linkClicks += row.linkClicks;
-    existingRow.startedMessages += row.startedMessages;
-  }
-
-  return Array.from(groupedRows.values()).map((row) => ({
-    ...row,
-    costPerLinkClick: row.linkClicks > 0 ? row.amountSpent / row.linkClicks : null,
-    costPerStartedMessage:
-      row.startedMessages > 0 ? row.amountSpent / row.startedMessages : null,
-    linkCtr: row.impressions > 0 ? (row.linkClicks / row.impressions) * 100 : null,
-  }));
-}
-
 async function fetchMetaJson<T>(url: string) {
   const response = await fetch(url, {
     cache: "no-store",
@@ -157,7 +125,7 @@ async function fetchMetaJson<T>(url: string) {
   return payload;
 }
 
-async function findCampaignId(accessToken: string, adAccountId: string) {
+async function findWhatsCampaigns(accessToken: string, adAccountId: string) {
   let nextUrl =
     `https://graph.facebook.com/${META_GRAPH_VERSION}/${adAccountId}/campaigns?` +
     new URLSearchParams({
@@ -166,18 +134,59 @@ async function findCampaignId(accessToken: string, adAccountId: string) {
       limit: "100",
     }).toString();
 
+  const campaigns: MetaCampaign[] = [];
+
   while (nextUrl) {
     const payload = await fetchMetaJson<MetaCampaignResponse>(nextUrl);
-    const campaign = payload.data?.find((item) => item.name === META_MESSAGES_CAMPAIGN_NAME);
+    const matchingCampaigns =
+      payload.data?.filter((campaign) => campaign.name?.includes(MESSAGES_CAMPAIGN_TAG)) ?? [];
 
-    if (campaign) {
-      return campaign.id;
-    }
-
+    campaigns.push(...matchingCampaigns);
     nextUrl = payload.paging?.next ?? "";
   }
 
-  return null;
+  return campaigns;
+}
+
+async function fetchCampaignInsights(
+  accessToken: string,
+  campaign: MetaCampaign,
+  since: string,
+  until: string
+) {
+  const insightsUrl =
+    `https://graph.facebook.com/${META_GRAPH_VERSION}/${campaign.id}/insights?` +
+    new URLSearchParams({
+      access_token: accessToken,
+      fields: "campaign_id,campaign_name,spend,impressions,inline_link_clicks,actions",
+      level: "campaign",
+      time_increment: "all_days",
+      time_range: JSON.stringify({ since, until }),
+    }).toString();
+
+  const payload = await fetchMetaJson<MetaInsightResponse>(insightsUrl);
+  const row = payload.data?.[0];
+
+  if (!row) {
+    return null;
+  }
+
+  const amountSpent = parseNumber(row.spend);
+  const startedMessages = extractStartedMessages(row.actions);
+  const linkClicks = parseNumber(row.inline_link_clicks);
+  const impressions = parseNumber(row.impressions);
+
+  return {
+    amountSpent,
+    campaignId: row.campaign_id ?? campaign.id,
+    campaignName: row.campaign_name ?? campaign.name,
+    costPerLinkClick: linkClicks > 0 ? amountSpent / linkClicks : null,
+    costPerStartedMessage: startedMessages > 0 ? amountSpent / startedMessages : null,
+    impressions,
+    linkClicks,
+    linkCtr: impressions > 0 ? (linkClicks / impressions) * 100 : null,
+    startedMessages,
+  } satisfies FacebookMessagesCampaignRow;
 }
 
 export async function getFacebookMessagesReport(
@@ -186,10 +195,11 @@ export async function getFacebookMessagesReport(
   const accessToken = process.env.FACEBOOK_ACCESS_TOKEN;
   const lastCheckedAt = new Date().toISOString();
   const { since, until } = getDateRange();
+  const campaignLabel = "Campanhas [WHATS] da conta";
 
   if (!accessToken) {
     return {
-      campaignName: META_MESSAGES_CAMPAIGN_NAME,
+      campaignLabel,
       lastCheckedAt,
       message: "Defina FACEBOOK_ACCESS_TOKEN para habilitar o relatorio de Mensagens.",
       rows: [],
@@ -200,13 +210,13 @@ export async function getFacebookMessagesReport(
   }
 
   try {
-    const campaignId = await findCampaignId(accessToken, adAccountId);
+    const campaigns = await findWhatsCampaigns(accessToken, adAccountId);
 
-    if (!campaignId) {
+    if (!campaigns.length) {
       return {
-        campaignName: META_MESSAGES_CAMPAIGN_NAME,
+        campaignLabel,
         lastCheckedAt,
-        message: "A campanha informada nao foi encontrada na conta de anuncios selecionada.",
+        message: "Nao ha campanha com [WHATS] na conta de anuncios selecionada.",
         rows: [],
         since,
         state: "not_found",
@@ -214,43 +224,15 @@ export async function getFacebookMessagesReport(
       };
     }
 
-    const insightsUrl =
-      `https://graph.facebook.com/${META_GRAPH_VERSION}/${campaignId}/insights?` +
-      new URLSearchParams({
-        access_token: accessToken,
-        fields: "ad_id,ad_name,spend,impressions,inline_link_clicks,actions",
-        level: "ad",
-        time_increment: "all_days",
-        time_range: JSON.stringify({ since, until }),
-      }).toString();
-
-    const insightsPayload = await fetchMetaJson<MetaInsightResponse>(insightsUrl);
-    const rows = aggregateRowsByAd(
-      insightsPayload.data?.map((row) => {
-        const amountSpent = parseNumber(row.spend);
-        const startedMessages = extractStartedMessages(row.actions);
-        const linkClicks = parseNumber(row.inline_link_clicks);
-        const impressions = parseNumber(row.impressions);
-
-        return {
-          adId: row.ad_id ?? "sem-id",
-          adName: row.ad_name ?? "Anuncio sem nome",
-          amountSpent,
-          costPerLinkClick: linkClicks > 0 ? amountSpent / linkClicks : null,
-          costPerStartedMessage:
-            startedMessages > 0 ? amountSpent / startedMessages : null,
-          impressions,
-          linkClicks,
-          linkCtr: impressions > 0 ? (linkClicks / impressions) * 100 : null,
-          startedMessages,
-        } satisfies FacebookMessagesRow;
-      }) ?? []
-    );
+    const rows = (await Promise.all(
+      campaigns.map((campaign) => fetchCampaignInsights(accessToken, campaign, since, until))
+    ))
+      .filter((row): row is FacebookMessagesCampaignRow => Boolean(row))
+      .sort((left, right) => left.campaignName.localeCompare(right.campaignName, "pt-BR"));
 
     if (!rows.length) {
       return {
-        campaignId,
-        campaignName: META_MESSAGES_CAMPAIGN_NAME,
+        campaignLabel,
         lastCheckedAt,
         rows: [],
         since,
@@ -260,8 +242,7 @@ export async function getFacebookMessagesReport(
     }
 
     return {
-      campaignId,
-      campaignName: META_MESSAGES_CAMPAIGN_NAME,
+      campaignLabel,
       lastCheckedAt,
       rows,
       since,
@@ -270,7 +251,7 @@ export async function getFacebookMessagesReport(
     };
   } catch (error) {
     return {
-      campaignName: META_MESSAGES_CAMPAIGN_NAME,
+      campaignLabel,
       lastCheckedAt,
       message:
         error instanceof Error

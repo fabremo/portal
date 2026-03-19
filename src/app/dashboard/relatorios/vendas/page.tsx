@@ -85,41 +85,79 @@ export default async function SalesReportPage() {
           </p>
         </article>
       ) : (
-        <article className="overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white shadow-card">
-          <div className="border-b border-gray-200 px-6 py-5">
-            <h3 className="text-xl font-semibold">Tabela de campanhas</h3>
-            <p className="mt-2 text-sm">
-              Acompanhe investimento, compras, faturamento e retorno das campanhas de vendas.
-            </p>
-          </div>
+        <div className="space-y-6">
+          <article className="overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white shadow-card">
+            <div className="border-b border-gray-200 px-6 py-5">
+              <h3 className="text-xl font-semibold">Tabela de campanhas</h3>
+              <p className="mt-2 text-sm">
+                Acompanhe investimento, compras, faturamento e retorno das campanhas de vendas.
+              </p>
+            </div>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-background text-left text-ink">
-                <tr>
-                  <th className="px-6 py-4 font-semibold">Campanha</th>
-                  <th className="px-6 py-4 font-semibold">Custo</th>
-                  <th className="px-6 py-4 font-semibold">Compras</th>
-                  <th className="px-6 py-4 font-semibold">Faturamento</th>
-                  <th className="px-6 py-4 font-semibold">ROAS</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {report.rows.map((row) => (
-                  <tr className="align-top" key={row.campaignId}>
-                    <td className="px-6 py-4">
-                      <p className="font-medium text-ink">{row.campaignName}</p>
-                    </td>
-                    <td className="px-6 py-4">{formatCurrency(row.amountSpent)}</td>
-                    <td className="px-6 py-4">{formatNumber(row.purchases)}</td>
-                    <td className="px-6 py-4">{formatCurrency(row.purchaseValue)}</td>
-                    <td className="px-6 py-4">{formatRoas(row.roas)}</td>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-background text-left text-ink">
+                  <tr>
+                    <th className="px-6 py-4 font-semibold">Campanha</th>
+                    <th className="px-6 py-4 font-semibold">Custo</th>
+                    <th className="px-6 py-4 font-semibold">Compras</th>
+                    <th className="px-6 py-4 font-semibold">Faturamento</th>
+                    <th className="px-6 py-4 font-semibold">ROAS</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </article>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {report.rows.map((row) => (
+                    <tr className="align-top" key={row.campaignId}>
+                      <td className="px-6 py-4">
+                        <p className="font-medium text-ink">{row.campaignName}</p>
+                      </td>
+                      <td className="px-6 py-4">{formatCurrency(row.amountSpent)}</td>
+                      <td className="px-6 py-4">{formatNumber(row.purchases)}</td>
+                      <td className="px-6 py-4">{formatCurrency(row.purchaseValue)}</td>
+                      <td className="px-6 py-4">{formatRoas(row.roas)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article className="overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white shadow-card">
+            <div className="border-b border-gray-200 px-6 py-5">
+              <h3 className="text-xl font-semibold">Tabela por dia</h3>
+              <p className="mt-2 text-sm">
+                Veja o consolidado diario das campanhas de vendas, do dia mais recente para o mais antigo.
+              </p>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-background text-left text-ink">
+                  <tr>
+                    <th className="px-6 py-4 font-semibold">Dia</th>
+                    <th className="px-6 py-4 font-semibold">Custo</th>
+                    <th className="px-6 py-4 font-semibold">Compras</th>
+                    <th className="px-6 py-4 font-semibold">Faturamento</th>
+                    <th className="px-6 py-4 font-semibold">ROAS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {report.dailyRows.map((row) => (
+                    <tr className="align-top" key={row.date}>
+                      <td className="px-6 py-4">
+                        <p className="font-medium text-ink">{formatDate(row.date)}</p>
+                      </td>
+                      <td className="px-6 py-4">{formatCurrency(row.amountSpent)}</td>
+                      <td className="px-6 py-4">{formatNumber(row.purchases)}</td>
+                      <td className="px-6 py-4">{formatCurrency(row.purchaseValue)}</td>
+                      <td className="px-6 py-4">{formatRoas(row.roas)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </div>
       )}
     </section>
   );

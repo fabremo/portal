@@ -57,10 +57,10 @@ export default async function MessagesReportPage() {
               Relatorio de mensagens
             </span>
             <div>
-              <h2 className="text-3xl font-semibold">Mensagens por anuncio</h2>
+              <h2 className="text-3xl font-semibold">Campanhas de mensagens</h2>
               <p className="mt-2 max-w-3xl">
                 Campanha analisada:{" "}
-                <span className="font-medium text-ink">{report.campaignName}</span>.
+                <span className="font-medium text-ink">{report.campaignLabel}</span>.
               </p>
               <p className="mt-1 text-sm text-ink/70">
                 Conta ativa:{" "}
@@ -86,15 +86,15 @@ export default async function MessagesReportPage() {
         <article className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-card md:p-8">
           <h3 className="text-xl font-semibold">Sem dados no periodo</h3>
           <p className="mt-3 text-sm">
-            A campanha foi encontrada, mas nao retornou anuncios com dados para o intervalo selecionado.
+            Existem campanhas com [WHATS], mas a Meta nao retornou dados para o intervalo selecionado.
           </p>
         </article>
       ) : (
         <article className="overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white shadow-card">
           <div className="border-b border-gray-200 px-6 py-5">
-            <h3 className="text-xl font-semibold">Tabela de anuncios</h3>
+            <h3 className="text-xl font-semibold">Tabela de campanhas</h3>
             <p className="mt-2 text-sm">
-              Acompanhe investimento, mensagens iniciadas e desempenho de link de cada anuncio.
+              Acompanhe investimento, mensagens iniciadas e desempenho de link de cada campanha.
             </p>
           </div>
 
@@ -102,7 +102,7 @@ export default async function MessagesReportPage() {
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-background text-left text-ink">
                 <tr>
-                  <th className="px-6 py-4 font-semibold">Anuncio</th>
+                  <th className="px-6 py-4 font-semibold">Campanha</th>
                   <th className="px-6 py-4 font-semibold">Custo</th>
                   <th className="px-6 py-4 font-semibold">Mensagens</th>
                   <th className="px-6 py-4 font-semibold">Custo por mensagem</th>
@@ -114,9 +114,9 @@ export default async function MessagesReportPage() {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {report.rows.map((row) => (
-                  <tr className="align-top" key={row.adName}>
+                  <tr className="align-top" key={row.campaignId}>
                     <td className="px-6 py-4">
-                      <p className="font-medium text-ink">{row.adName}</p>
+                      <p className="font-medium text-ink">{row.campaignName}</p>
                     </td>
                     <td className="px-6 py-4">{formatCurrency(row.amountSpent)}</td>
                     <td className="px-6 py-4">{formatNumber(row.startedMessages)}</td>
