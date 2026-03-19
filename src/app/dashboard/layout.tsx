@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { NoAdAccountAccess } from "@/components/dashboard/no-ad-account-access";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
+import { MetaReportsProvider } from "@/components/dashboard/meta-reports-provider";
 import { getDashboardAccessContext } from "@/lib/dashboard/access";
 
 type DashboardLayoutProps = {
@@ -17,15 +18,17 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   }
 
   return (
-    <main className="page-shell px-4 py-6 md:px-6 lg:px-8">
-      <div className="mx-auto grid min-h-[calc(100vh-3rem)] max-w-7xl gap-6 lg:grid-cols-[280px_1fr]">
-        <DashboardSidebar
-          accessibleAccounts={accessContext.accessibleAccounts}
-          activeAdAccount={accessContext.activeAdAccount}
-          userEmail={accessContext.userEmail}
-        />
-        {accessContext.activeAdAccount ? children : <NoAdAccountAccess />}
-      </div>
-    </main>
+    <MetaReportsProvider userId={accessContext.userId}>
+      <main className="page-shell px-4 py-6 md:px-6 lg:px-8">
+        <div className="mx-auto grid min-h-[calc(100vh-3rem)] max-w-7xl gap-6 lg:grid-cols-[280px_1fr]">
+          <DashboardSidebar
+            accessibleAccounts={accessContext.accessibleAccounts}
+            activeAdAccount={accessContext.activeAdAccount}
+            userEmail={accessContext.userEmail}
+          />
+          {accessContext.activeAdAccount ? children : <NoAdAccountAccess />}
+        </div>
+      </main>
+    </MetaReportsProvider>
   );
 }

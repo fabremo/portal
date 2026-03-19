@@ -4,6 +4,7 @@ import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { clearMetaReportsSessionCache } from "@/components/dashboard/meta-reports-provider";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 export function SignOutButton() {
@@ -12,6 +13,8 @@ export function SignOutButton() {
 
   async function handleSignOut() {
     const supabase = createBrowserSupabaseClient();
+
+    clearMetaReportsSessionCache();
 
     if (!supabase) {
       router.replace("/login");
@@ -35,4 +38,3 @@ export function SignOutButton() {
     </button>
   );
 }
-
