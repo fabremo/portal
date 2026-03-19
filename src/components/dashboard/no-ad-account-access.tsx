@@ -1,0 +1,28 @@
+export function NoAdAccountAccess() {
+  return (
+    <section className="space-y-6">
+      <header className="section-shell px-6 py-6 md:px-8">
+        <div className="space-y-3">
+          <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-amber-700">
+            Acesso pendente
+          </span>
+          <div>
+            <h2 className="text-3xl font-semibold">Nenhuma conta de anuncio vinculada</h2>
+            <p className="mt-2 max-w-2xl">
+              Seu acesso ao portal foi validado, mas ainda nao existe uma conta de anuncio liberada
+              para o seu usuario.
+            </p>
+          </div>
+        </div>
+      </header>
+
+      <article className="rounded-[1.75rem] border border-amber-200 bg-white p-6 shadow-card md:p-8">
+        <h3 className="text-xl font-semibold">O que fazer agora</h3>
+        <p className="mt-3 text-sm text-ink/72">
+          Peca ao time responsavel para vincular sua conta no Supabase. Assim que a permissao for
+          cadastrada, o dashboard passara a mostrar os dados da sua conta de anuncio.
+        </p>
+      </article>
+    </section>
+  );
+}

@@ -8,14 +8,21 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
-  LifeBuoy,
   MessageSquareText,
-  WalletCards,
 } from "lucide-react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { AccountSwitcher } from "@/components/dashboard/account-switcher";
+
+type AccessibleAdAccount = {
+  id: string;
+  isDefault: boolean;
+  name: string;
+};
 
 type DashboardSidebarProps = {
+  accessibleAccounts: AccessibleAdAccount[];
+  activeAdAccount: AccessibleAdAccount | null;
   userEmail: string;
 };
 
@@ -26,8 +33,8 @@ const reportLinks = [
     label: "Leads",
   },
   {
-    disabled: true,
-    href: "#",
+    disabled: false,
+    href: "/dashboard/relatorios/vendas",
     label: "Vendas",
   },
   {
@@ -37,7 +44,11 @@ const reportLinks = [
   },
 ];
 
-export function DashboardSidebar({ userEmail }: DashboardSidebarProps) {
+export function DashboardSidebar({
+  accessibleAccounts,
+  activeAdAccount,
+  userEmail,
+}: DashboardSidebarProps) {
   const pathname = usePathname();
   const isOverviewActive = pathname === "/dashboard";
   const isReportsRoute = pathname.startsWith("/dashboard/relatorios");
@@ -51,8 +62,24 @@ export function DashboardSidebar({ userEmail }: DashboardSidebarProps) {
         </p>
         <h1 className="mt-3 text-2xl font-semibold text-white">Painel do cliente</h1>
         <p className="mt-2 text-sm leading-6 text-white/68">
-          Visualize campanhas, oportunidades e indicadores de vendas com leitura rápida.
+          Visualize campanhas, oportunidades e indicadores de vendas com leitura rapida.
         </p>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-white/10 bg-white/6 p-5">
+        {accessibleAccounts.length > 1 && activeAdAccount ? (
+          <AccountSwitcher accounts={accessibleAccounts} activeAccountId={activeAdAccount.id} />
+        ) : activeAdAccount ? (
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-[0.22em] text-white/55">Conta de anuncio</p>
+            <p className="text-sm font-medium text-white">{activeAdAccount.name}</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-[0.22em] text-white/55">Conta de anuncio</p>
+            <p className="text-sm text-white/70">Nenhuma conta liberada</p>
+          </div>
+        )}
       </div>
 
       <nav className="mt-8 space-y-2">
@@ -67,7 +94,7 @@ export function DashboardSidebar({ userEmail }: DashboardSidebarProps) {
         >
           <span className="flex items-center gap-3">
             <BarChart3 className="h-4 w-4" />
-            Visão geral
+            Visao geral
           </span>
           <ChevronRight className="h-4 w-4" />
         </Link>
@@ -83,7 +110,7 @@ export function DashboardSidebar({ userEmail }: DashboardSidebarProps) {
           >
             <span className="flex items-center gap-3">
               <FileText className="h-4 w-4" />
-              Relatórios
+              Relatorios
             </span>
             <ChevronDown
               className={[
@@ -118,7 +145,11 @@ export function DashboardSidebar({ userEmail }: DashboardSidebarProps) {
                     key={label}
                   >
                     <span className="flex items-center gap-2">
-                      <MessageSquareText className="h-4 w-4" />
+                      {label === "Mensagens" ? (
+                        <MessageSquareText className="h-4 w-4" />
+                      ) : (
+                        <BarChart3 className="h-4 w-4" />
+                      )}
                       {label}
                     </span>
                     <ChevronRight className="h-4 w-4" />
@@ -128,27 +159,10 @@ export function DashboardSidebar({ userEmail }: DashboardSidebarProps) {
             </div>
           ) : null}
         </div>
-
-        {[
-          { href: "#", icon: WalletCards, label: "Financeiro" },
-          { href: "#", icon: LifeBuoy, label: "Suporte" },
-        ].map(({ href, icon: Icon, label }) => (
-          <Link
-            className="flex items-center justify-between rounded-2xl px-4 py-3 text-sm text-white/74 transition hover:bg-white/8 hover:text-white"
-            href={href}
-            key={label}
-          >
-            <span className="flex items-center gap-3">
-              <Icon className="h-4 w-4" />
-              {label}
-            </span>
-            <ChevronRight className="h-4 w-4" />
-          </Link>
-        ))}
       </nav>
 
       <div className="mt-auto rounded-3xl border border-white/10 bg-white/6 p-5">
-        <p className="text-sm text-white/68">Sessão ativa como</p>
+        <p className="text-sm text-white/68">Sessao ativa como</p>
         <p className="mt-2 break-all text-sm font-medium text-white">{userEmail}</p>
         <div className="mt-5">
           <SignOutButton />
@@ -157,4 +171,3 @@ export function DashboardSidebar({ userEmail }: DashboardSidebarProps) {
     </aside>
   );
 }
-

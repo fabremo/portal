@@ -1,7 +1,6 @@
 import "server-only";
 
 const META_GRAPH_VERSION = "v25.0";
-const META_AD_ACCOUNT_ID = "act_570278580327487";
 const META_MESSAGES_CAMPAIGN_NAME = "[ENGAJAMENTO] [WHATS] [IVAN] [REGULAR]";
 
 type MetaAction = {
@@ -16,11 +15,11 @@ type MetaCampaign = {
 
 type MetaCampaignResponse = {
   data?: MetaCampaign[];
-  paging?: {
-    next?: string;
-  };
   error?: {
     message?: string;
+  };
+  paging?: {
+    next?: string;
   };
 };
 
@@ -48,6 +47,7 @@ export type FacebookMessagesRow = {
   costPerStartedMessage: number | null;
   impressions: number;
   linkClicks: number;
+  linkCtr: number | null;
   startedMessages: number;
 };
 
@@ -57,22 +57,37 @@ export type FacebookMessagesReportResult =
       lastCheckedAt: string;
       message: string;
       rows: [];
+      since: string;
       state: "not_configured" | "not_found" | "error";
+      until: string;
     }
   | {
       campaignId: string;
       campaignName: string;
       lastCheckedAt: string;
       rows: FacebookMessagesRow[];
+      since: string;
       state: "empty" | "ok";
+      until: string;
     };
 
 function getDateRange() {
-  const until = new Date();
-  const since = new Date();
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+
+  const until = new Date(today);
+  until.setDate(today.getDate() - 1);
+
+  const since = new Date(until);
   since.setDate(until.getDate() - 6);
 
-  const format = (value: Date) => value.toISOString().slice(0, 10);
+  const format = (value: Date) => {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+
+    return year + "-" + month + "-" + day;
+  };
 
   return {
     since: format(since),
@@ -97,6 +112,37 @@ function extractStartedMessages(actions?: MetaAction[]) {
   return parseNumber(match?.value);
 }
 
+function getAdGroupKey(row: Pick<FacebookMessagesRow, "adName">) {
+  return row.adName.trim().toLocaleLowerCase("pt-BR");
+}
+
+function aggregateRowsByAd(rows: FacebookMessagesRow[]) {
+  const groupedRows = new Map<string, FacebookMessagesRow>();
+
+  for (const row of rows) {
+    const groupKey = getAdGroupKey(row);
+    const existingRow = groupedRows.get(groupKey);
+
+    if (!existingRow) {
+      groupedRows.set(groupKey, { ...row });
+      continue;
+    }
+
+    existingRow.amountSpent += row.amountSpent;
+    existingRow.impressions += row.impressions;
+    existingRow.linkClicks += row.linkClicks;
+    existingRow.startedMessages += row.startedMessages;
+  }
+
+  return Array.from(groupedRows.values()).map((row) => ({
+    ...row,
+    costPerLinkClick: row.linkClicks > 0 ? row.amountSpent / row.linkClicks : null,
+    costPerStartedMessage:
+      row.startedMessages > 0 ? row.amountSpent / row.startedMessages : null,
+    linkCtr: row.impressions > 0 ? (row.linkClicks / row.impressions) * 100 : null,
+  }));
+}
+
 async function fetchMetaJson<T>(url: string) {
   const response = await fetch(url, {
     cache: "no-store",
@@ -111,9 +157,9 @@ async function fetchMetaJson<T>(url: string) {
   return payload;
 }
 
-async function findCampaignId(accessToken: string) {
+async function findCampaignId(accessToken: string, adAccountId: string) {
   let nextUrl =
-    `https://graph.facebook.com/${META_GRAPH_VERSION}/${META_AD_ACCOUNT_ID}/campaigns?` +
+    `https://graph.facebook.com/${META_GRAPH_VERSION}/${adAccountId}/campaigns?` +
     new URLSearchParams({
       access_token: accessToken,
       fields: "id,name",
@@ -134,34 +180,40 @@ async function findCampaignId(accessToken: string) {
   return null;
 }
 
-export async function getFacebookMessagesReport(): Promise<FacebookMessagesReportResult> {
+export async function getFacebookMessagesReport(
+  adAccountId: string
+): Promise<FacebookMessagesReportResult> {
   const accessToken = process.env.FACEBOOK_ACCESS_TOKEN;
   const lastCheckedAt = new Date().toISOString();
+  const { since, until } = getDateRange();
 
   if (!accessToken) {
     return {
       campaignName: META_MESSAGES_CAMPAIGN_NAME,
       lastCheckedAt,
-      message: "Defina FACEBOOK_ACCESS_TOKEN para habilitar o relatório de Mensagens.",
+      message: "Defina FACEBOOK_ACCESS_TOKEN para habilitar o relatorio de Mensagens.",
       rows: [],
+      since,
       state: "not_configured",
+      until,
     };
   }
 
   try {
-    const campaignId = await findCampaignId(accessToken);
+    const campaignId = await findCampaignId(accessToken, adAccountId);
 
     if (!campaignId) {
       return {
         campaignName: META_MESSAGES_CAMPAIGN_NAME,
         lastCheckedAt,
-        message: "A campanha informada não foi encontrada na conta de anúncios.",
+        message: "A campanha informada nao foi encontrada na conta de anuncios selecionada.",
         rows: [],
+        since,
         state: "not_found",
+        until,
       };
     }
 
-    const { since, until } = getDateRange();
     const insightsUrl =
       `https://graph.facebook.com/${META_GRAPH_VERSION}/${campaignId}/insights?` +
       new URLSearchParams({
@@ -173,24 +225,27 @@ export async function getFacebookMessagesReport(): Promise<FacebookMessagesRepor
       }).toString();
 
     const insightsPayload = await fetchMetaJson<MetaInsightResponse>(insightsUrl);
-    const rows =
+    const rows = aggregateRowsByAd(
       insightsPayload.data?.map((row) => {
         const amountSpent = parseNumber(row.spend);
         const startedMessages = extractStartedMessages(row.actions);
         const linkClicks = parseNumber(row.inline_link_clicks);
+        const impressions = parseNumber(row.impressions);
 
         return {
           adId: row.ad_id ?? "sem-id",
-          adName: row.ad_name ?? "Anúncio sem nome",
+          adName: row.ad_name ?? "Anuncio sem nome",
           amountSpent,
           costPerLinkClick: linkClicks > 0 ? amountSpent / linkClicks : null,
           costPerStartedMessage:
             startedMessages > 0 ? amountSpent / startedMessages : null,
-          impressions: parseNumber(row.impressions),
+          impressions,
           linkClicks,
+          linkCtr: impressions > 0 ? (linkClicks / impressions) * 100 : null,
           startedMessages,
         } satisfies FacebookMessagesRow;
-      }) ?? [];
+      }) ?? []
+    );
 
     if (!rows.length) {
       return {
@@ -198,7 +253,9 @@ export async function getFacebookMessagesReport(): Promise<FacebookMessagesRepor
         campaignName: META_MESSAGES_CAMPAIGN_NAME,
         lastCheckedAt,
         rows: [],
+        since,
         state: "empty",
+        until,
       };
     }
 
@@ -207,7 +264,9 @@ export async function getFacebookMessagesReport(): Promise<FacebookMessagesRepor
       campaignName: META_MESSAGES_CAMPAIGN_NAME,
       lastCheckedAt,
       rows,
+      since,
       state: "ok",
+      until,
     };
   } catch (error) {
     return {
@@ -216,9 +275,11 @@ export async function getFacebookMessagesReport(): Promise<FacebookMessagesRepor
       message:
         error instanceof Error
           ? error.message
-          : "Não foi possível consultar a API da Meta para o relatório.",
+          : "Nao foi possivel consultar a API da Meta para o relatorio.",
       rows: [],
+      since,
       state: "error",
+      until,
     };
   }
 }

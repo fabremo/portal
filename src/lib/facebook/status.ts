@@ -1,20 +1,19 @@
 import "server-only";
 
 const META_GRAPH_VERSION = "v25.0";
-const META_AD_ACCOUNT_ID = "act_570278580327487";
 const META_BUSINESS_ID = "196217288123195";
 
 type MetaAdAccountResponse = {
-  id: string;
-  name: string;
   account_status: number;
   disable_reason?: number | null;
+  id: string;
+  name: string;
 };
 
 type MetaGraphErrorResponse = {
   error?: {
-    message?: string;
     code?: number;
+    message?: string;
     type?: string;
   };
 };
@@ -44,11 +43,11 @@ function mapAccountStatus(accountStatus: number | null): Pick<
     case 8:
     case 9:
     case 100:
-      return { statusLabel: "Com restrição", statusTone: "warning" };
+      return { statusLabel: "Com restricao", statusTone: "warning" };
     case null:
-      return { statusLabel: "Indisponível", statusTone: "neutral" };
+      return { statusLabel: "Indisponivel", statusTone: "neutral" };
     default:
-      return { statusLabel: "Status não mapeado", statusTone: "neutral" };
+      return { statusLabel: "Status nao mapeado", statusTone: "neutral" };
   }
 }
 
@@ -59,22 +58,25 @@ function mapDisableReason(disableReason?: number | null) {
     case 0:
       return null;
     case 1:
-      return "Restrição aplicada pela Meta por política ou integridade da conta.";
+      return "Restricao aplicada pela Meta por politica ou integridade da conta.";
     case 2:
-      return "A conta exige regularização de cobrança ou limite financeiro.";
+      return "A conta exige regularizacao de cobranca ou limite financeiro.";
     case 3:
-      return "A conta precisa de revisão administrativa para voltar a operar.";
+      return "A conta precisa de revisao administrativa para voltar a operar.";
     case 4:
-      return "A conta está em análise ou com limitação operacional temporária.";
+      return "A conta esta em analise ou com limitacao operacional temporaria.";
     default:
-      return `Motivo informado pela Meta (código ${disableReason}).`;
+      return `Motivo informado pela Meta (codigo ${disableReason}).`;
   }
 }
 
-function createUnavailableStatus(statusLabel: FacebookAccountStatus["statusLabel"]) {
+function createUnavailableStatus(
+  adAccountId: string,
+  statusLabel: FacebookAccountStatus["statusLabel"]
+) {
   return {
-    accountId: META_AD_ACCOUNT_ID,
-    accountName: "Conta não disponível",
+    accountId: adAccountId,
+    accountName: "Conta nao disponivel",
     disableReasonText: null,
     lastCheckedAt: new Date().toISOString(),
     rawStatusCode: null,
@@ -83,11 +85,11 @@ function createUnavailableStatus(statusLabel: FacebookAccountStatus["statusLabel
   } satisfies FacebookAccountStatus;
 }
 
-export async function getFacebookAccountStatus(): Promise<FacebookAccountStatus> {
+export async function getFacebookAccountStatus(adAccountId: string): Promise<FacebookAccountStatus> {
   const accessToken = process.env.FACEBOOK_ACCESS_TOKEN;
 
   if (!accessToken) {
-    return createUnavailableStatus("Não configurado");
+    return createUnavailableStatus(adAccountId, "Nao configurado");
   }
 
   const params = new URLSearchParams({
@@ -97,7 +99,7 @@ export async function getFacebookAccountStatus(): Promise<FacebookAccountStatus>
 
   try {
     const response = await fetch(
-      `https://graph.facebook.com/${META_GRAPH_VERSION}/${META_AD_ACCOUNT_ID}?${params.toString()}`,
+      `https://graph.facebook.com/${META_GRAPH_VERSION}/${adAccountId}?${params.toString()}`,
       {
         cache: "no-store",
       }
@@ -106,13 +108,13 @@ export async function getFacebookAccountStatus(): Promise<FacebookAccountStatus>
     const payload = (await response.json()) as MetaAdAccountResponse & MetaGraphErrorResponse;
 
     if (!response.ok || payload.error) {
-      return createUnavailableStatus("Indisponível");
+      return createUnavailableStatus(adAccountId, "Indisponivel");
     }
 
     const mappedStatus = mapAccountStatus(payload.account_status ?? null);
 
     return {
-      accountId: payload.id ?? META_AD_ACCOUNT_ID,
+      accountId: payload.id ?? adAccountId,
       accountName: payload.name ?? "Conta sem nome",
       disableReasonText: mapDisableReason(payload.disable_reason),
       lastCheckedAt: new Date().toISOString(),
@@ -121,11 +123,10 @@ export async function getFacebookAccountStatus(): Promise<FacebookAccountStatus>
       statusTone: mappedStatus.statusTone,
     };
   } catch {
-    return createUnavailableStatus("Indisponível");
+    return createUnavailableStatus(adAccountId, "Indisponivel");
   }
 }
 
 export const facebookAccountReference = {
-  adAccountId: META_AD_ACCOUNT_ID,
   businessId: META_BUSINESS_ID,
 };
