@@ -278,9 +278,10 @@ export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesRe
                     <th className="px-6 py-4 font-semibold">Nome do anuncio</th>
                     <th className="px-6 py-4 font-semibold">Custo</th>
                     <th className="px-6 py-4 font-semibold">Compra</th>
-                    <th className="px-6 py-4 font-semibold">CTR% do link</th>
-                    <th className="px-6 py-4 font-semibold">CPC link</th>
+                    <th className="px-6 py-4 font-semibold">CTR%</th>
+                    <th className="px-6 py-4 font-semibold">CPC</th>
                     <th className="px-6 py-4 font-semibold">Custo por compra</th>
+                    <th className="px-6 py-4 font-semibold">ROAS</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -292,6 +293,8 @@ export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesRe
                       <td className="px-6 py-4">{formatPercent(row.linkCtr)}</td>
                       <td className="px-6 py-4">{row.costPerLinkClick === null ? "-" : formatCurrency(row.costPerLinkClick)}</td>
                       <td className="px-6 py-4">{row.costPerPurchase === null ? "-" : formatCurrency(row.costPerPurchase)}</td>
+                      <td className="px-6 py-4">{formatRoas(row.roas)}</td>
+
                     </tr>
                   ))}
                 </tbody>

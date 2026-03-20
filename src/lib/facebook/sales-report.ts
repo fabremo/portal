@@ -72,47 +72,49 @@ export type FacebookSalesAdRow = {
   costPerPurchase: number | null;
   linkCtr: number | null;
   purchases: number;
+  purchaseValue: number;
+  roas: number | null;
 };
 
 export type FacebookSalesReportResult =
   | {
-      adRows: [];
-      dailyRows: [];
-      lastCheckedAt: string;
-      message: string;
-      rows: [];
-      since: string;
-      state: "not_configured" | "not_found" | "error";
-      until: string;
-    }
+    adRows: [];
+    dailyRows: [];
+    lastCheckedAt: string;
+    message: string;
+    rows: [];
+    since: string;
+    state: "not_configured" | "not_found" | "error";
+    until: string;
+  }
   | {
-      adRows: FacebookSalesAdRow[];
-      dailyRows: FacebookSalesDailyRow[];
-      lastCheckedAt: string;
-      rows: FacebookSalesRow[];
-      since: string;
-      state: "empty" | "ok";
-      until: string;
-    };
+    adRows: FacebookSalesAdRow[];
+    dailyRows: FacebookSalesDailyRow[];
+    lastCheckedAt: string;
+    rows: FacebookSalesRow[];
+    since: string;
+    state: "empty" | "ok";
+    until: string;
+  };
 
 export type FacebookSalesOverviewSummary =
   | {
-      lastCheckedAt: string;
-      message: string;
-      since: string;
-      state: "not_configured" | "not_found" | "error";
-      totalAmountSpent: null;
-      totalPurchases: null;
-      until: string;
-    }
+    lastCheckedAt: string;
+    message: string;
+    since: string;
+    state: "not_configured" | "not_found" | "error";
+    totalAmountSpent: null;
+    totalPurchases: null;
+    until: string;
+  }
   | {
-      lastCheckedAt: string;
-      since: string;
-      state: "empty" | "ok";
-      totalAmountSpent: number;
-      totalPurchases: number;
-      until: string;
-    };
+    lastCheckedAt: string;
+    since: string;
+    state: "empty" | "ok";
+    totalAmountSpent: number;
+    totalPurchases: number;
+    until: string;
+  };
 
 function getDateRange() {
   const today = new Date();
@@ -146,7 +148,7 @@ function parseNumber(value?: string | number | null) {
 function isPurchaseActionType(actionType?: string) {
   return Boolean(
     actionType &&
-      PURCHASE_ACTION_TYPES.includes(actionType as (typeof PURCHASE_ACTION_TYPES)[number])
+    PURCHASE_ACTION_TYPES.includes(actionType as (typeof PURCHASE_ACTION_TYPES)[number])
   );
 }
 
@@ -228,6 +230,7 @@ function buildAdRows(rows: MetaInsightRow[]) {
       impressions: number;
       linkClicks: number;
       purchases: number;
+      purchaseValue: number;
     }
   >();
 
@@ -243,6 +246,11 @@ function buildAdRows(rows: MetaInsightRow[]) {
     const linkClicks = parseNumber(row.inline_link_clicks);
     const purchases = extractPurchaseCount(row.actions);
     const existingRow = groupedRows.get(adName);
+    const purchaseValue = extractPurchaseValue(row.action_values);
+
+
+
+
 
     if (!existingRow) {
       groupedRows.set(adName, {
@@ -251,6 +259,7 @@ function buildAdRows(rows: MetaInsightRow[]) {
         impressions,
         linkClicks,
         purchases,
+        purchaseValue,
       });
       continue;
     }
@@ -259,6 +268,8 @@ function buildAdRows(rows: MetaInsightRow[]) {
     existingRow.impressions += impressions;
     existingRow.linkClicks += linkClicks;
     existingRow.purchases += purchases;
+    existingRow.purchaseValue += purchaseValue;
+
   }
 
   return Array.from(groupedRows.values())
@@ -269,6 +280,8 @@ function buildAdRows(rows: MetaInsightRow[]) {
       costPerPurchase: row.purchases > 0 ? row.amountSpent / row.purchases : null,
       linkCtr: row.impressions > 0 ? (row.linkClicks / row.impressions) * 100 : null,
       purchases: row.purchases,
+      purchaseValue: row.purchaseValue,
+      roas: calculateRoas(row.amountSpent, row.purchaseValue),
     }))
     .sort((left, right) => {
       if (right.purchases !== left.purchases) {
@@ -396,7 +409,7 @@ async function fetchAdSalesInsights(
     `https://graph.facebook.com/${META_GRAPH_VERSION}/${adAccountId}/insights?` +
     new URLSearchParams({
       access_token: accessToken,
-      fields: "ad_id,ad_name,campaign_id,campaign_name,spend,impressions,inline_link_clicks,actions",
+      fields: "ad_id,ad_name,campaign_id,campaign_name,spend,impressions,inline_link_clicks,actions,action_values",
       level: "ad",
       time_increment: "all_days",
       time_range: JSON.stringify({ since, until }),

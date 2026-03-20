@@ -34,28 +34,30 @@ type SalesAdRow = {
   costPerPurchase: number | null;
   linkCtr: number | null;
   purchases: number;
+  purchaseValue: number;
+  roas: number | null;
 };
 
 export type ClientSalesReportResult =
   | {
-      adRows: [];
-      dailyRows: [];
-      lastCheckedAt: string;
-      message: string;
-      rows: [];
-      since: string;
-      state: "not_configured" | "not_found" | "error";
-      until: string;
-    }
+    adRows: [];
+    dailyRows: [];
+    lastCheckedAt: string;
+    message: string;
+    rows: [];
+    since: string;
+    state: "not_configured" | "not_found" | "error";
+    until: string;
+  }
   | {
-      adRows: SalesAdRow[];
-      dailyRows: SalesDailyRow[];
-      lastCheckedAt: string;
-      rows: SalesRow[];
-      since: string;
-      state: "empty" | "ok";
-      until: string;
-    };
+    adRows: SalesAdRow[];
+    dailyRows: SalesDailyRow[];
+    lastCheckedAt: string;
+    rows: SalesRow[];
+    since: string;
+    state: "empty" | "ok";
+    until: string;
+  };
 
 type MessagesRow = {
   amountSpent: number;
@@ -71,22 +73,22 @@ type MessagesRow = {
 
 export type ClientMessagesReportResult =
   | {
-      campaignLabel: string;
-      lastCheckedAt: string;
-      message: string;
-      rows: [];
-      since: string;
-      state: "not_configured" | "not_found" | "error";
-      until: string;
-    }
+    campaignLabel: string;
+    lastCheckedAt: string;
+    message: string;
+    rows: [];
+    since: string;
+    state: "not_configured" | "not_found" | "error";
+    until: string;
+  }
   | {
-      campaignLabel: string;
-      lastCheckedAt: string;
-      rows: MessagesRow[];
-      since: string;
-      state: "empty" | "ok";
-      until: string;
-    };
+    campaignLabel: string;
+    lastCheckedAt: string;
+    rows: MessagesRow[];
+    since: string;
+    state: "empty" | "ok";
+    until: string;
+  };
 
 type MetaReportsContextValue = {
   getMessagesReport: (adAccountId: string) => Promise<ClientMessagesReportResult>;
