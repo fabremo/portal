@@ -71,7 +71,9 @@ function createMessagesErrorResult(message: string): ClientMessagesReportResult 
   const { since, until } = getDateRange();
 
   return {
+    adRows: [],
     campaignLabel: "Campanhas [WHATS] da conta",
+    dailyRows: [],
     lastCheckedAt: new Date().toISOString(),
     message,
     rows: [],
@@ -143,6 +145,9 @@ export function MessagesReportContent({
     );
   }
 
+  const campaignRows = report.rows ?? [];
+  const dailyRows = report.dailyRows ?? [];
+  const adRows = report.adRows ?? [];
   const lastCheckedAt = new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",
@@ -190,44 +195,120 @@ export function MessagesReportContent({
           </p>
         </article>
       ) : (
-        <article className="overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white shadow-card">
-          <div className="border-b border-gray-200 px-6 py-5">
-            <h3 className="text-xl font-semibold">Tabela de campanhas</h3>
-            <p className="mt-2 text-sm">
-              Acompanhe investimento, mensagens iniciadas e desempenho de link de cada campanha.
-            </p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-background text-left text-ink">
-                <tr>
-                  <th className="px-6 py-4 font-semibold">Campanha</th>
-                  <th className="px-6 py-4 font-semibold">Custo</th>
-                  <th className="px-6 py-4 font-semibold">Mensagens</th>
-                  <th className="px-6 py-4 font-semibold">Custo por mensagem</th>
-                  <th className="px-6 py-4 font-semibold">Impressoes</th>
-                  <th className="px-6 py-4 font-semibold">Cliques</th>
-                  <th className="px-6 py-4 font-semibold">CTR%</th>
-                  <th className="px-6 py-4 font-semibold">CPC</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {report.rows.map((row) => (
-                  <tr className="align-top" key={row.campaignId}>
-                    <td className="px-6 py-4"><p className="font-medium text-ink">{row.campaignName}</p></td>
-                    <td className="px-6 py-4">{formatCurrency(row.amountSpent)}</td>
-                    <td className="px-6 py-4">{formatNumber(row.startedMessages)}</td>
-                    <td className="px-6 py-4">{formatCurrency(row.costPerStartedMessage)}</td>
-                    <td className="px-6 py-4">{formatNumber(row.impressions)}</td>
-                    <td className="px-6 py-4">{formatNumber(row.linkClicks)}</td>
-                    <td className="px-6 py-4">{formatPercentage(row.linkCtr)}</td>
-                    <td className="px-6 py-4">{formatCurrency(row.costPerLinkClick)}</td>
+        <div className="space-y-6">
+          <article className="overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white shadow-card">
+            <div className="border-b border-gray-200 px-6 py-5">
+              <h3 className="text-xl font-semibold">Tabela de campanhas</h3>
+              <p className="mt-2 text-sm">
+                Acompanhe investimento, mensagens iniciadas e desempenho de link de cada campanha.
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-background text-left text-ink">
+                  <tr>
+                    <th className="px-6 py-4 font-semibold">Campanha</th>
+                    <th className="px-6 py-4 font-semibold">Custo</th>
+                    <th className="px-6 py-4 font-semibold">Mensagens</th>
+                    <th className="px-6 py-4 font-semibold">Custo por mensagem</th>
+                    <th className="px-6 py-4 font-semibold">Impressoes</th>
+                    <th className="px-6 py-4 font-semibold">Cliques</th>
+                    <th className="px-6 py-4 font-semibold">CTR%</th>
+                    <th className="px-6 py-4 font-semibold">CPC</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </article>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {campaignRows.map((row) => (
+                    <tr className="align-top" key={row.campaignId}>
+                      <td className="px-6 py-4"><p className="font-medium text-ink">{row.campaignName}</p></td>
+                      <td className="px-6 py-4">{formatCurrency(row.amountSpent)}</td>
+                      <td className="px-6 py-4">{formatNumber(row.startedMessages)}</td>
+                      <td className="px-6 py-4">{formatCurrency(row.costPerStartedMessage)}</td>
+                      <td className="px-6 py-4">{formatNumber(row.impressions)}</td>
+                      <td className="px-6 py-4">{formatNumber(row.linkClicks)}</td>
+                      <td className="px-6 py-4">{formatPercentage(row.linkCtr)}</td>
+                      <td className="px-6 py-4">{formatCurrency(row.costPerLinkClick)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article className="overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white shadow-card">
+            <div className="border-b border-gray-200 px-6 py-5">
+              <h3 className="text-xl font-semibold">Tabela por dia</h3>
+              <p className="mt-2 text-sm">
+                Veja o consolidado diario das campanhas de mensagens, do dia mais recente para o mais antigo.
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-background text-left text-ink">
+                  <tr>
+                    <th className="px-6 py-4 font-semibold">Dia</th>
+                    <th className="px-6 py-4 font-semibold">Custo</th>
+                    <th className="px-6 py-4 font-semibold">Mensagens</th>
+                    <th className="px-6 py-4 font-semibold">Custo por mensagem</th>
+                    <th className="px-6 py-4 font-semibold">Impressoes</th>
+                    <th className="px-6 py-4 font-semibold">Cliques</th>
+                    <th className="px-6 py-4 font-semibold">CTR%</th>
+                    <th className="px-6 py-4 font-semibold">CPC</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {dailyRows.map((row) => (
+                    <tr className="align-top" key={row.date}>
+                      <td className="px-6 py-4"><p className="font-medium text-ink">{formatDate(row.date)}</p></td>
+                      <td className="px-6 py-4">{formatCurrency(row.amountSpent)}</td>
+                      <td className="px-6 py-4">{formatNumber(row.startedMessages)}</td>
+                      <td className="px-6 py-4">{formatCurrency(row.costPerStartedMessage)}</td>
+                      <td className="px-6 py-4">{formatNumber(row.impressions)}</td>
+                      <td className="px-6 py-4">{formatNumber(row.linkClicks)}</td>
+                      <td className="px-6 py-4">{formatPercentage(row.linkCtr)}</td>
+                      <td className="px-6 py-4">{formatCurrency(row.costPerLinkClick)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article className="overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white shadow-card">
+            <div className="border-b border-gray-200 px-6 py-5">
+              <h3 className="text-xl font-semibold">Tabela por anuncio</h3>
+              <p className="mt-2 text-sm">
+                Consolide os anuncios pelo nome e priorize os que mais geraram mensagens no periodo.
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-background text-left text-ink">
+                  <tr>
+                    <th className="px-6 py-4 font-semibold">Nome do anuncio</th>
+                    <th className="px-6 py-4 font-semibold">Custo</th>
+                    <th className="px-6 py-4 font-semibold">Mensagens</th>
+                    <th className="px-6 py-4 font-semibold">CTR%</th>
+                    <th className="px-6 py-4 font-semibold">CPC</th>
+                    <th className="px-6 py-4 font-semibold">Custo por mensagem</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {adRows.map((row) => (
+                    <tr className="align-top" key={row.adName}>
+                      <td className="px-6 py-4"><p className="font-medium text-ink">{row.adName}</p></td>
+                      <td className="px-6 py-4">{formatCurrency(row.amountSpent)}</td>
+                      <td className="px-6 py-4">{formatNumber(row.startedMessages)}</td>
+                      <td className="px-6 py-4">{formatPercentage(row.linkCtr)}</td>
+                      <td className="px-6 py-4">{formatCurrency(row.costPerLinkClick)}</td>
+                      <td className="px-6 py-4">{formatCurrency(row.costPerStartedMessage)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </div>
       )}
     </section>
   );

@@ -71,9 +71,31 @@ type MessagesRow = {
   startedMessages: number;
 };
 
+type MessagesDailyRow = {
+  amountSpent: number;
+  costPerLinkClick: number | null;
+  costPerStartedMessage: number | null;
+  date: string;
+  impressions: number;
+  linkClicks: number;
+  linkCtr: number | null;
+  startedMessages: number;
+};
+
+type MessagesAdRow = {
+  adName: string;
+  amountSpent: number;
+  costPerLinkClick: number | null;
+  costPerStartedMessage: number | null;
+  linkCtr: number | null;
+  startedMessages: number;
+};
+
 export type ClientMessagesReportResult =
   | {
+    adRows: [];
     campaignLabel: string;
+    dailyRows: [];
     lastCheckedAt: string;
     message: string;
     rows: [];
@@ -82,7 +104,9 @@ export type ClientMessagesReportResult =
     until: string;
   }
   | {
+    adRows: MessagesAdRow[];
     campaignLabel: string;
+    dailyRows: MessagesDailyRow[];
     lastCheckedAt: string;
     rows: MessagesRow[];
     since: string;
@@ -130,6 +154,29 @@ function getDateRange() {
 function buildCacheKey(userId: string, adAccountId: string, kind: ReportKind) {
   const { since, until } = getDateRange();
   return `${META_REPORT_CACHE_PREFIX}:${userId}:${adAccountId}:${kind}:${since}:${until}`;
+}
+
+function normalizeMessagesReport(report: ClientMessagesReportResult) {
+  return {
+    ...report,
+    adRows: Array.isArray((report as { adRows?: unknown }).adRows)
+      ? report.adRows
+      : [],
+    dailyRows: Array.isArray((report as { dailyRows?: unknown }).dailyRows)
+      ? report.dailyRows
+      : [],
+    rows: Array.isArray((report as { rows?: unknown }).rows)
+      ? report.rows
+      : [],
+  } as ClientMessagesReportResult;
+}
+
+function normalizeReport<T>(kind: ReportKind, report: T) {
+  if (kind === "messages") {
+    return normalizeMessagesReport(report as ClientMessagesReportResult) as T;
+  }
+
+  return report;
 }
 
 function readSessionValue<T>(key: string) {
@@ -187,14 +234,16 @@ export function MetaReportsProvider({ children, userId }: MetaReportsProviderPro
       const memoryValue = memoryCacheRef.current.get(cacheKey);
 
       if (memoryValue) {
-        return memoryValue as T;
+        return normalizeReport(kind, memoryValue as T);
       }
 
       const sessionValue = readSessionValue<T>(cacheKey);
 
       if (sessionValue) {
-        memoryCacheRef.current.set(cacheKey, sessionValue);
-        return sessionValue;
+        const normalizedSessionValue = normalizeReport(kind, sessionValue);
+        memoryCacheRef.current.set(cacheKey, normalizedSessionValue);
+        writeSessionValue(cacheKey, normalizedSessionValue);
+        return normalizedSessionValue;
       }
 
       const inflightRequest = inflightRequestsRef.current.get(cacheKey);
@@ -207,7 +256,7 @@ export function MetaReportsProvider({ children, userId }: MetaReportsProviderPro
         cache: "no-store",
       })
         .then(async (response) => {
-          const payload = (await response.json()) as T;
+          const payload = normalizeReport(kind, (await response.json()) as T);
 
           if (!response.ok) {
             throw new Error("Nao foi possivel carregar o relatorio.");

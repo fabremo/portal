@@ -221,6 +221,16 @@ function buildDailyRows(rows: MetaInsightRow[]) {
   );
 }
 
+/**
+ * Consolida as linhas brutas de insights por anúncio retornadas pela Meta.
+ *
+ * Agrupa os registros pelo nome do anúncio, soma os principais indicadores
+ * (gasto, impressões, cliques, compras e faturamento) e calcula métricas
+ * derivadas como CTR, CPC, custo por compra e ROAS.
+ *
+ * O resultado final dessa função alimenta a tabela "por anúncio" do relatório.
+ */
+
 function buildAdRows(rows: MetaInsightRow[]) {
   const groupedRows = new Map<
     string,
@@ -428,6 +438,22 @@ async function fetchAdSalesInsights(
 
   return buildAdRows(rows);
 }
+
+/**
+ * Monta o relatório completo de vendas da conta de anúncios selecionada.
+ *
+ * Fluxo:
+ * 1. Valida se existe token da Meta configurado.
+ * 2. Busca as campanhas da conta cujo nome contenha [VENDAS].
+ * 3. Consulta, em paralelo, os dados agregados por campanha, por dia e por anúncio.
+ * 4. Normaliza os dados retornados pela API da Meta e calcula métricas como compras,
+ *    faturamento, custo por compra e ROAS.
+ * 5. Retorna um objeto único para a UI, com estados de sucesso, vazio, erro ou
+ *    configuração ausente.
+ *
+ * Essa é a função principal do relatório de vendas e serve como ponto central de
+ * orquestração dos fetches e transformações feitas neste arquivo.
+ */
 
 export async function getFacebookSalesReport(
   adAccountId: string

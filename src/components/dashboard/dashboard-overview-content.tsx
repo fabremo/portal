@@ -144,9 +144,9 @@ export function DashboardOverviewContent({
               Resumo da operacao
             </span>
             <div>
-              <h2 className="text-3xl font-semibold">Visao geral do cliente</h2>
+              <h2 className="text-3xl font-semibold">Visão geral do cliente</h2>
               <p className="mt-2 max-w-2xl">
-                Aqui voce acompanha o status da sua conta de anuncios e confirma qual conta esta
+                Aqui voce acompanha o status da sua conta de anúncios e confirma qual conta esta
                 ativa no portal.
               </p>
               <p className="mt-1 text-sm text-ink/70">
@@ -173,7 +173,7 @@ export function DashboardOverviewContent({
                 <p>Codigo bruto: {facebookStatus.rawStatusCode ?? "N/A"}</p>
               ) : null}
               {facebookStatus.disableReasonText ? <p>Motivo: {facebookStatus.disableReasonText}</p> : null}
-              <p>Ultima consulta: {lastCheckedAt}</p>
+              <p>Última consulta: {lastCheckedAt}</p>
             </div>
           </div>
         </div>
@@ -184,7 +184,7 @@ export function DashboardOverviewContent({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ink/55">
-                Total de purchases
+                Total de compras
               </p>
               {totalPurchases !== null ? (
                 <p className="mt-4 text-4xl font-semibold text-ink">{formatNumber(totalPurchases)}</p>
