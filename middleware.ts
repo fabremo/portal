@@ -27,10 +27,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (hasAuthCookie && pathname === "/login") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
@@ -60,10 +56,6 @@ export async function middleware(request: NextRequest) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirectedFrom", `${pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(loginUrl);
-  }
-
-  if (hasAuthCookie && user && pathname === "/login") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return response;
