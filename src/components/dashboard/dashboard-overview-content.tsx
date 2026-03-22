@@ -103,9 +103,9 @@ export function DashboardOverviewContent({
           setSalesReport(report);
         }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (isMounted) {
-          setSalesReport(createSalesErrorResult("Nao foi possivel carregar os dados de vendas."));
+          setSalesReport(createSalesErrorResult(error instanceof Error ? error.message : "Nao foi possivel carregar os dados de vendas."));
         }
       });
 
@@ -235,3 +235,4 @@ export function DashboardOverviewContent({
     </section>
   );
 }
+

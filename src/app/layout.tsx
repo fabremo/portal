@@ -3,8 +3,11 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Portal de Clientes",
-  description: "Portal de clientes com autenticação, campanhas e indicadores de vendas.",
+  title: {
+    default: "Portal de Clientes",
+    template: "%s | Portal de Clientes",
+  },
+  description: "Portal de clientes com autenticacao, campanhas e indicadores de vendas.",
 };
 
 type RootLayoutProps = {

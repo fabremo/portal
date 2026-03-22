@@ -24,9 +24,10 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
           <DashboardSidebar
             accessibleAccounts={accessContext.accessibleAccounts}
             activeAdAccount={accessContext.activeAdAccount}
+            isAdmin={accessContext.isAdmin}
             userEmail={accessContext.userEmail}
           />
-          {accessContext.activeAdAccount ? children : <NoAdAccountAccess />}
+          {accessContext.activeAdAccount || accessContext.isAdmin ? children : <NoAdAccountAccess />}
         </div>
       </main>
     </MetaReportsProvider>

@@ -1,11 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { hasSupabaseAuthCookie } from "@/lib/supabase/auth-session";
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const hasAuthCookie = hasSupabaseAuthCookie(request.cookies.getAll());
   let response = NextResponse.next({
     request,
   });
@@ -16,6 +19,16 @@ export async function middleware(request: NextRequest) {
     }
 
     return response;
+  }
+
+  if (!hasAuthCookie && pathname.startsWith("/dashboard")) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirectedFrom", `${pathname}${request.nextUrl.search}`);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if (hasAuthCookie && pathname === "/login") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -43,13 +56,13 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user && pathname.startsWith("/dashboard")) {
+  if (hasAuthCookie && !user && pathname.startsWith("/dashboard")) {
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("redirectedFrom", pathname);
+    loginUrl.searchParams.set("redirectedFrom", `${pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (user && pathname === "/login") {
+  if (hasAuthCookie && user && pathname === "/login") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

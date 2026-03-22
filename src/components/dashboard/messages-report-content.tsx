@@ -99,9 +99,9 @@ export function MessagesReportContent({
           setReport(nextReport);
         }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (isMounted) {
-          setReport(createMessagesErrorResult("Nao foi possivel carregar o relatorio de mensagens."));
+          setReport(createMessagesErrorResult(error instanceof Error ? error.message : "Nao foi possivel carregar o relatorio de mensagens."));
         }
       });
 
@@ -313,3 +313,4 @@ export function MessagesReportContent({
     </section>
   );
 }
+

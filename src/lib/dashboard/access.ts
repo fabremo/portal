@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const ACTIVE_AD_ACCOUNT_COOKIE_NAME = "portal_active_ad_account";
+export type UserRole = "admin" | "common";
 
 export type AccessibleAdAccount = {
   id: string;
@@ -16,6 +17,8 @@ export type AccessibleAdAccount = {
 export type DashboardAccessContext = {
   accessibleAccounts: AccessibleAdAccount[];
   activeAdAccount: AccessibleAdAccount | null;
+  isAdmin: boolean;
+  role: UserRole;
   userEmail: string;
   userId: string;
 };
@@ -30,6 +33,10 @@ type UserAdAccountRow = {
   ad_accounts: JoinedAdAccount[] | JoinedAdAccount | null;
   is_active: boolean;
   is_default: boolean;
+};
+
+type ProfileRow = {
+  role: string | null;
 };
 
 function resolveActiveAdAccount(
@@ -63,6 +70,56 @@ function getJoinedAdAccount(row: UserAdAccountRow) {
   return row.ad_accounts;
 }
 
+function normalizeRole(role: string | null | undefined): UserRole {
+  return role === "admin" ? "admin" : "common";
+}
+
+async function resolveUserRole(
+  supabase: NonNullable<Awaited<ReturnType<typeof createServerSupabaseClient>>>,
+  userId: string
+) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    return "common" satisfies UserRole;
+  }
+
+  return normalizeRole((data as ProfileRow | null)?.role);
+}
+
+function mapUserAdAccountRows(data: UserAdAccountRow[]) {
+  return data
+    .filter((row) => row.is_active)
+    .map((row) => {
+      const joinedAdAccount = getJoinedAdAccount(row);
+
+      return {
+        id: joinedAdAccount?.id ?? "",
+        isActive: joinedAdAccount?.is_active ?? false,
+        isDefault: row.is_default,
+        name: joinedAdAccount?.name ?? "Conta sem nome",
+      };
+    })
+    .filter((account) => account.id && account.isActive)
+    .map(({ isActive: _isActive, ...account }) => account)
+    .sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
+}
+
+function mapAdminAccounts(data: JoinedAdAccount[]) {
+  return data
+    .filter((account) => account.is_active)
+    .map((account) => ({
+      id: account.id,
+      isDefault: false,
+      name: account.name,
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
+}
+
 export const getDashboardAccessContext = cache(async (): Promise<DashboardAccessContext | null> => {
   const supabase = await createServerSupabaseClient();
 
@@ -78,42 +135,36 @@ export const getDashboardAccessContext = cache(async (): Promise<DashboardAccess
     return null;
   }
 
-  const { data, error } = await supabase
-    .from("user_ad_accounts")
-    .select(
-      `
-        is_active,
-        is_default,
-        ad_accounts!inner (
-          id,
+  const role = await resolveUserRole(supabase, user.id);
+  const isAdmin = role === "admin";
+  const accountQuery = isAdmin
+    ? supabase.from("ad_accounts").select("id, is_active, name").eq("is_active", true)
+    : supabase
+      .from("user_ad_accounts")
+      .select(
+        `
           is_active,
-          name
-        )
-      `
-    )
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .eq("ad_accounts.is_active", true);
+          is_default,
+          ad_accounts!inner (
+            id,
+            is_active,
+            name
+          )
+        `
+      )
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .eq("ad_accounts.is_active", true);
+
+  const { data, error } = await accountQuery;
 
   if (error) {
     throw new Error("Nao foi possivel carregar as contas de anuncio do usuario.");
   }
 
-  const accessibleAccounts = ((data ?? []) as unknown as UserAdAccountRow[])
-    .filter((row) => row.is_active)
-    .map((row) => {
-      const joinedAdAccount = getJoinedAdAccount(row);
-
-      return {
-        id: joinedAdAccount?.id ?? "",
-        isActive: joinedAdAccount?.is_active ?? false,
-        isDefault: row.is_default,
-        name: joinedAdAccount?.name ?? "Conta sem nome",
-      };
-    })
-    .filter((account) => account.id && account.isActive)
-    .map(({ isActive: _isActive, ...account }) => account)
-    .sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
+  const accessibleAccounts = isAdmin
+    ? mapAdminAccounts((data ?? []) as JoinedAdAccount[])
+    : mapUserAdAccountRows((data ?? []) as UserAdAccountRow[]);
 
   const cookieStore = await cookies();
   const cookieAccountId = cookieStore.get(ACTIVE_AD_ACCOUNT_COOKIE_NAME)?.value;
@@ -121,6 +172,8 @@ export const getDashboardAccessContext = cache(async (): Promise<DashboardAccess
   return {
     accessibleAccounts,
     activeAdAccount: resolveActiveAdAccount(accessibleAccounts, cookieAccountId),
+    isAdmin,
+    role,
     userEmail: user.email ?? "usuario@empresa.com",
     userId: user.id,
   };

@@ -102,9 +102,9 @@ export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesRe
           setReport(nextReport);
         }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (isMounted) {
-          setReport(createSalesErrorResult("Nao foi possivel carregar o relatorio de vendas."));
+          setReport(createSalesErrorResult(error instanceof Error ? error.message : "Nao foi possivel carregar o relatorio de vendas."));
         }
       });
 
@@ -306,3 +306,4 @@ export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesRe
     </section>
   );
 }
+

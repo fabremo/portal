@@ -9,6 +9,7 @@ import {
   ChevronRight,
   FileText,
   MessageSquareText,
+  Settings,
 } from "lucide-react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
@@ -23,6 +24,7 @@ type AccessibleAdAccount = {
 type DashboardSidebarProps = {
   accessibleAccounts: AccessibleAdAccount[];
   activeAdAccount: AccessibleAdAccount | null;
+  isAdmin: boolean;
   userEmail: string;
 };
 
@@ -47,11 +49,13 @@ const reportLinks = [
 export function DashboardSidebar({
   accessibleAccounts,
   activeAdAccount,
+  isAdmin,
   userEmail,
 }: DashboardSidebarProps) {
   const pathname = usePathname();
   const isOverviewActive = pathname === "/dashboard";
   const isReportsRoute = pathname.startsWith("/dashboard/relatorios");
+  const isSettingsActive = pathname === "/dashboard/configuracoes";
   const [isReportsExpanded, setIsReportsExpanded] = useState(isReportsRoute);
 
   return (
@@ -159,6 +163,24 @@ export function DashboardSidebar({
             </div>
           ) : null}
         </div>
+
+        {isAdmin ? (
+          <Link
+            className={[
+              "flex items-center justify-between rounded-2xl px-4 py-3 text-sm transition",
+              isSettingsActive
+                ? "bg-white text-ink shadow-card"
+                : "text-white/74 hover:bg-white/8 hover:text-white",
+            ].join(" ")}
+            href="/dashboard/configuracoes"
+          >
+            <span className="flex items-center gap-3">
+              <Settings className="h-4 w-4" />
+              Configuracoes
+            </span>
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        ) : null}
       </nav>
 
       <div className="mt-auto rounded-3xl border border-white/10 bg-white/6 p-5">

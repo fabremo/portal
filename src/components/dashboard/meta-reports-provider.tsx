@@ -119,6 +119,10 @@ type MetaReportsContextValue = {
   getSalesReport: (adAccountId: string) => Promise<ClientSalesReportResult>;
 };
 
+type ApiErrorResponse = {
+  message?: string;
+};
+
 type MetaReportsProviderProps = PropsWithChildren<{
   userId: string;
 }>;
@@ -206,6 +210,17 @@ function writeSessionValue(key: string, value: unknown) {
   window.sessionStorage.setItem(key, JSON.stringify(value));
 }
 
+function createApiError(status: number, payload: ApiErrorResponse | null) {
+  const fallbackMessage =
+    status === 401
+      ? "Sua sessao expirou. Entre novamente para continuar."
+      : status === 403
+        ? "Voce nao tem acesso a esta conta de anuncios."
+        : "Nao foi possivel carregar o relatorio.";
+
+  return new Error(payload?.message || fallbackMessage);
+}
+
 export function clearMetaReportsSessionCache() {
   if (typeof window === "undefined") {
     return;
@@ -252,19 +267,22 @@ export function MetaReportsProvider({ children, userId }: MetaReportsProviderPro
         return inflightRequest as Promise<T>;
       }
 
-      const request = fetch(`/api/dashboard/reports/${kind}?adAccountId=${encodeURIComponent(adAccountId)}`, {
-        cache: "no-store",
-      })
+      const request = fetch(`/api/dashboard/reports/${kind}?adAccountId=${encodeURIComponent(adAccountId)}`,
+        {
+          cache: "no-store",
+        })
         .then(async (response) => {
-          const payload = normalizeReport(kind, (await response.json()) as T);
+          const payload = (await response.json()) as T | ApiErrorResponse;
 
           if (!response.ok) {
-            throw new Error("Nao foi possivel carregar o relatorio.");
+            throw createApiError(response.status, payload as ApiErrorResponse);
           }
 
-          memoryCacheRef.current.set(cacheKey, payload);
-          writeSessionValue(cacheKey, payload);
-          return payload;
+          const normalizedPayload = normalizeReport(kind, payload as T);
+
+          memoryCacheRef.current.set(cacheKey, normalizedPayload);
+          writeSessionValue(cacheKey, normalizedPayload);
+          return normalizedPayload;
         })
         .finally(() => {
           inflightRequestsRef.current.delete(cacheKey);
