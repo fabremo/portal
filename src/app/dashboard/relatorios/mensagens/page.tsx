@@ -1,10 +1,10 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 
 import { MessagesReportContent } from "@/components/dashboard/messages-report-content";
 import { getDashboardAccessContext } from "@/lib/dashboard/access";
 
 export const metadata: Metadata = {
-  title: "Relatorio de Mensagens",
+  title: "Relatório de Mensagens",
 };
 
 export default async function MessagesReportPage() {

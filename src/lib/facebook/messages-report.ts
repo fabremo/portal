@@ -1,4 +1,4 @@
-import "server-only";
+﻿import "server-only";
 
 const META_GRAPH_VERSION = "v25.0";
 const MESSAGES_CAMPAIGN_TAG = "[WHATS]";
@@ -260,7 +260,7 @@ async function fetchMetaJson<T>(url: string) {
   const payload = (await response.json()) as T & { error?: { message?: string } };
 
   if (!response.ok || payload.error) {
-    throw new Error(payload.error?.message ?? "Falha ao consultar a API da Meta.");
+    throw new Error(payload.error?.message || "Falha ao consultar a API da Meta.");
   }
 
   return payload;
@@ -319,8 +319,8 @@ async function fetchCampaignInsights(
 
   return {
     amountSpent,
-    campaignId: row.campaign_id ?? campaign.id,
-    campaignName: row.campaign_name ?? campaign.name,
+    campaignId: row.campaign_id || campaign.id,
+    campaignName: row.campaign_name || campaign.name,
     costPerLinkClick: linkClicks > 0 ? amountSpent / linkClicks : null,
     costPerStartedMessage: startedMessages > 0 ? amountSpent / startedMessages : null,
     impressions,
@@ -404,7 +404,7 @@ export async function getFacebookMessagesReport(
       campaignLabel,
       dailyRows: [],
       lastCheckedAt,
-      message: "Defina FACEBOOK_ACCESS_TOKEN para habilitar o relatorio de Mensagens.",
+      message: "Defina FACEBOOK_ACCESS_TOKEN para habilitar o relatório de Mensagens.",
       rows: [],
       since,
       state: "not_configured",
@@ -421,7 +421,7 @@ export async function getFacebookMessagesReport(
         campaignLabel,
         dailyRows: [],
         lastCheckedAt,
-        message: "Nao ha campanha com [WHATS] na conta de anuncios selecionada.",
+        message: "Não há campanha com [WHATS] na conta de anúncios selecionada.",
         rows: [],
         since,
         state: "not_found",
@@ -473,7 +473,7 @@ export async function getFacebookMessagesReport(
       message:
         error instanceof Error
           ? error.message
-          : "Nao foi possivel consultar a API da Meta para o relatorio.",
+          : "Não foi possível consultar a API da Meta para o relatório.",
       rows: [],
       since,
       state: "error",
@@ -481,3 +481,6 @@ export async function getFacebookMessagesReport(
     };
   }
 }
+
+
+

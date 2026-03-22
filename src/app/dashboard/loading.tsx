@@ -1,4 +1,4 @@
-import { BellDot, LoaderCircle } from "lucide-react";
+﻿import { BellDot, LoaderCircle } from "lucide-react";
 
 export default function DashboardLoading() {
   return (
@@ -11,9 +11,9 @@ export default function DashboardLoading() {
               Carregando dashboard
             </span>
             <div>
-              <h2 className="text-3xl font-semibold">Preparando a visao geral</h2>
+              <h2 className="text-3xl font-semibold">Preparando a visão geral</h2>
               <p className="mt-2 max-w-3xl text-ink/72">
-                Estamos validando a sua sessao e consultando os dados da conta ativa.
+                Estamos validando a sua sessão e consultando os dados da conta ativa.
               </p>
             </div>
           </div>

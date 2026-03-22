@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { BarChart3, LoaderCircle } from "lucide-react";
@@ -104,7 +104,11 @@ export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesRe
       })
       .catch((error: unknown) => {
         if (isMounted) {
-          setReport(createSalesErrorResult(error instanceof Error ? error.message : "Nao foi possivel carregar o relatorio de vendas."));
+          setReport(
+            createSalesErrorResult(
+              error instanceof Error ? error.message : "Não foi possível carregar o relatório de vendas."
+            )
+          );
         }
       });
 
@@ -121,12 +125,12 @@ export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesRe
             <div className="space-y-3">
               <span className="inline-flex items-center gap-2 rounded-full border border-accent/15 bg-accent/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-accent">
                 <BarChart3 className="h-3.5 w-3.5" />
-                Relatorio de vendas
+                Relatório de vendas
               </span>
               <div>
                 <h2 className="text-3xl font-semibold">Campanhas de vendas</h2>
                 <p className="mt-2 max-w-3xl text-ink/72">
-                  Estamos consultando a Meta e reaproveitando os dados da sessao quando possivel.
+                  Estamos consultando a Meta e reaproveitando os dados da sessão quando possível.
                 </p>
               </div>
             </div>
@@ -163,7 +167,7 @@ export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesRe
           <div className="space-y-3">
             <span className="inline-flex items-center gap-2 rounded-full border border-accent/15 bg-accent/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-accent">
               <BarChart3 className="h-3.5 w-3.5" />
-              Relatorio de vendas
+              Relatório de vendas
             </span>
             <div>
               <h2 className="text-3xl font-semibold">Campanhas de vendas</h2>
@@ -179,21 +183,21 @@ export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesRe
             </div>
           </div>
           <div className="rounded-2xl border border-black/5 bg-background px-5 py-4 text-sm text-ink/70">
-            Ultima consulta: {lastCheckedAt}
+            Última consulta: {lastCheckedAt}
           </div>
         </div>
       </header>
 
       {report.state === "error" || report.state === "not_configured" || report.state === "not_found" ? (
         <article className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-card md:p-8">
-          <h3 className="text-xl font-semibold">Nao foi possivel carregar o relatorio</h3>
+          <h3 className="text-xl font-semibold">Não foi possível carregar o relatório</h3>
           <p className="mt-3 text-sm">{report.message}</p>
         </article>
       ) : report.state === "empty" ? (
         <article className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-card md:p-8">
           <h3 className="text-xl font-semibold">Sem campanhas de vendas com dados</h3>
           <p className="mt-3 text-sm">
-            Existem campanhas com [VENDAS], mas a Meta nao retornou resultados para o periodo selecionado.
+            Existem campanhas com [VENDAS], mas a Meta não retornou resultados para o período selecionado.
           </p>
         </article>
       ) : (
@@ -235,7 +239,7 @@ export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesRe
             <div className="border-b border-gray-200 px-6 py-5">
               <h3 className="text-xl font-semibold">Tabela por dia</h3>
               <p className="mt-2 text-sm">
-                Veja o consolidado diario das campanhas de vendas, do dia mais recente para o mais antigo.
+                Veja o consolidado diário das campanhas de vendas, do dia mais recente para o mais antigo.
               </p>
             </div>
             <div className="overflow-x-auto">
@@ -266,16 +270,16 @@ export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesRe
 
           <article className="overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white shadow-card">
             <div className="border-b border-gray-200 px-6 py-5">
-              <h3 className="text-xl font-semibold">Tabela por anuncio</h3>
+              <h3 className="text-xl font-semibold">Tabela por anúncio</h3>
               <p className="mt-2 text-sm">
-                Consolide os anuncios pelo nome e priorize os que mais geraram compras no periodo.
+                Consolide os anúncios pelo nome e priorize os que mais geraram compras no período.
               </p>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-background text-left text-ink">
                   <tr>
-                    <th className="px-6 py-4 font-semibold">Nome do anuncio</th>
+                    <th className="px-6 py-4 font-semibold">Nome do anúncio</th>
                     <th className="px-6 py-4 font-semibold">Custo</th>
                     <th className="px-6 py-4 font-semibold">Compra</th>
                     <th className="px-6 py-4 font-semibold">CTR%</th>
@@ -294,7 +298,6 @@ export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesRe
                       <td className="px-6 py-4">{row.costPerLinkClick === null ? "-" : formatCurrency(row.costPerLinkClick)}</td>
                       <td className="px-6 py-4">{row.costPerPurchase === null ? "-" : formatCurrency(row.costPerPurchase)}</td>
                       <td className="px-6 py-4">{formatRoas(row.roas)}</td>
-
                     </tr>
                   ))}
                 </tbody>
@@ -306,4 +309,3 @@ export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesRe
     </section>
   );
 }
-

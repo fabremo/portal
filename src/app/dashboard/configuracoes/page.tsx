@@ -1,11 +1,11 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Settings, ShieldCheck } from "lucide-react";
 
 import { getDashboardAccessContext } from "@/lib/dashboard/access";
 
 export const metadata: Metadata = {
-  title: "Configuracoes",
+  title: "Configurações",
 };
 
 export default async function DashboardSettingsPage() {
@@ -26,12 +26,12 @@ export default async function DashboardSettingsPage() {
           <div className="space-y-3">
             <span className="inline-flex items-center gap-2 rounded-full border border-accent/15 bg-accent/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-accent">
               <ShieldCheck className="h-3.5 w-3.5" />
-              Area administrativa
+              Área administrativa
             </span>
             <div>
-              <h2 className="text-3xl font-semibold">Configuracoes do portal</h2>
+              <h2 className="text-3xl font-semibold">Configurações do portal</h2>
               <p className="mt-2 max-w-3xl text-ink/72">
-                Esta tela foi reservada para as configuracoes administrativas que virao na proxima etapa.
+                Esta tela foi reservada para as configurações administrativas que virão na próxima etapa.
               </p>
             </div>
           </div>
@@ -43,9 +43,10 @@ export default async function DashboardSettingsPage() {
       </header>
 
       <article className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-card md:p-8">
-        <h3 className="text-xl font-semibold">Espaco preparado para configuracoes</h3>
+        <h3 className="text-xl font-semibold">Espaço preparado para configurações</h3>
         <p className="mt-3 text-sm text-ink/72">
-          O controle de acesso administrativo ja esta ativo. A proxima entrega pode adicionar aqui as ferramentas de configuracao sem refazer a autorizacao.
+          O controle de acesso administrativo já está ativo. A próxima entrega pode adicionar aqui
+          as ferramentas de configuração sem refazer a autorização.
         </p>
       </article>
     </section>

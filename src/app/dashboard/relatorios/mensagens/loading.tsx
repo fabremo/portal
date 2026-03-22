@@ -1,4 +1,4 @@
-import { LoaderCircle, MessageSquareText } from "lucide-react";
+﻿import { LoaderCircle, MessageSquareText } from "lucide-react";
 
 export default function MessagesReportLoading() {
   return (
@@ -8,12 +8,12 @@ export default function MessagesReportLoading() {
           <div className="space-y-3">
             <span className="inline-flex items-center gap-2 rounded-full border border-accent/15 bg-accent/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-accent">
               <MessageSquareText className="h-3.5 w-3.5" />
-              Relatorio de mensagens
+              Relatório de mensagens
             </span>
             <div>
               <h2 className="text-3xl font-semibold">Carregando campanhas de mensagens</h2>
               <p className="mt-2 max-w-3xl text-ink/72">
-                Estamos consultando a Meta e montando o relatorio da conta selecionada.
+                Estamos consultando a Meta e montando o relatório da conta selecionada.
               </p>
             </div>
           </div>

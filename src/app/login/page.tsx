@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 
@@ -9,10 +9,18 @@ export const metadata: Metadata = {
   title: "Login",
 };
 
-export default async function LoginPage() {
+type LoginPageProps = {
+  searchParams?: Promise<{
+    skipRedirect?: string;
+  }>;
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const shouldSkipRedirect = resolvedSearchParams?.skipRedirect === "1";
   const supabase = await createServerSupabaseClient();
 
-  if (supabase) {
+  if (supabase && !shouldSkipRedirect) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -32,22 +40,22 @@ export default async function LoginPage() {
         <section className="hidden space-y-8 lg:block">
           <div className="inline-flex items-center gap-2 rounded-full border border-accent/15 bg-accent/8 px-4 py-2 text-sm font-medium text-accent">
             <ShieldCheck className="h-4 w-4" />
-            Ambiente seguro e rastreavel
+            Ambiente seguro e rastreável
           </div>
           <div className="space-y-4">
             <h1 className="max-w-xl text-5xl font-semibold leading-tight">
               Entre no portal para acompanhar seus resultados com clareza.
             </h1>
             <p className="max-w-xl text-lg">
-              Aqui voce visualiza campanhas de anuncios, geracao de oportunidades e o avanco
-              das vendas da sua empresa em uma experiencia leve, profissional e objetiva.
+              Aqui você visualiza campanhas de anúncios, geração de oportunidades e o avanço das
+              vendas da sua empresa em uma experiência leve, profissional e objetiva.
             </p>
           </div>
           <div className="grid max-w-2xl gap-4 md:grid-cols-3">
             {[
-              ["Campanhas", "Acompanhe midia ativa, investimento e desempenho por periodo."],
-              ["Oportunidades", "Veja o volume de leads e a evolucao do funil comercial."],
-              ["Resultados", "Tenha uma leitura executiva das vendas e dos proximos passos."],
+              ["Campanhas", "Acompanhe mídia ativa, investimento e desempenho por período."],
+              ["Oportunidades", "Veja o volume de leads e a evolução do funil comercial."],
+              ["Resultados", "Tenha uma leitura executiva das vendas e dos próximos passos."],
             ].map(([title, copy]) => (
               <article
                 className="rounded-3xl border border-black/5 bg-white/88 p-5 shadow-card backdrop-blur"

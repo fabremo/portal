@@ -1,4 +1,4 @@
-import "server-only";
+﻿import "server-only";
 
 import { cache } from "react";
 import { cookies } from "next/headers";
@@ -98,10 +98,10 @@ function mapUserAdAccountRows(data: UserAdAccountRow[]) {
       const joinedAdAccount = getJoinedAdAccount(row);
 
       return {
-        id: joinedAdAccount?.id ?? "",
+        id: joinedAdAccount?.id || "",
         isActive: joinedAdAccount?.is_active ?? false,
         isDefault: row.is_default,
-        name: joinedAdAccount?.name ?? "Conta sem nome",
+        name: joinedAdAccount?.name || "Conta sem nome",
       };
     })
     .filter((account) => account.id && account.isActive)
@@ -115,7 +115,7 @@ function mapAdminAccounts(data: JoinedAdAccount[]) {
     .map((account) => ({
       id: account.id,
       isDefault: false,
-      name: account.name,
+      name: account.name || "Conta sem nome",
     }))
     .sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
 }
@@ -140,9 +140,9 @@ export const getDashboardAccessContext = cache(async (): Promise<DashboardAccess
   const accountQuery = isAdmin
     ? supabase.from("ad_accounts").select("id, is_active, name").eq("is_active", true)
     : supabase
-      .from("user_ad_accounts")
-      .select(
-        `
+        .from("user_ad_accounts")
+        .select(
+          `
           is_active,
           is_default,
           ad_accounts!inner (
@@ -151,15 +151,15 @@ export const getDashboardAccessContext = cache(async (): Promise<DashboardAccess
             name
           )
         `
-      )
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .eq("ad_accounts.is_active", true);
+        )
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .eq("ad_accounts.is_active", true);
 
   const { data, error } = await accountQuery;
 
   if (error) {
-    throw new Error("Nao foi possivel carregar as contas de anuncio do usuario.");
+    throw new Error("Não foi possível carregar as contas de anúncio do usuário.");
   }
 
   const accessibleAccounts = isAdmin
@@ -174,7 +174,7 @@ export const getDashboardAccessContext = cache(async (): Promise<DashboardAccess
     activeAdAccount: resolveActiveAdAccount(accessibleAccounts, cookieAccountId),
     isAdmin,
     role,
-    userEmail: user.email ?? "usuario@empresa.com",
+    userEmail: user.email || "usuario@empresa.com",
     userId: user.id,
   };
 });

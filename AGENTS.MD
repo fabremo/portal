@@ -1,4 +1,4 @@
-# AGENTS.md
+﻿# AGENTS.md
 
 ## Goal
 Work as a practical coding agent for this repository.
@@ -32,6 +32,12 @@ Do not rely only on memory when the answer may have changed.
 - Do not introduce new abstractions without a concrete reason.
 - Prefer readable, production-safe code over clever code.
 - Avoid speculative multi-file refactors unless requested.
+
+## Language and text rules
+- All user-facing Portuguese text must be written in PT-BR with correct accentuation.
+- Keep all edited text files in UTF-8.
+- When adding or changing labels, messages, headings, metadata, placeholders, or CTAs in Portuguese, review accentuation and encoding before finishing.
+- Treat mojibake or missing accent marks in user-facing copy as defects to be fixed.
 
 ## Next.js rules
 - Treat Next.js as version-sensitive.

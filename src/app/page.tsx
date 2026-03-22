@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import {
   ArrowRight,
   BriefcaseBusiness,
@@ -56,9 +56,9 @@ export default function Home() {
                   Acompanhe suas campanhas, seus leads e as vendas da sua empresa em um só lugar.
                 </h1>
                 <p className="max-w-2xl text-lg">
-                  A Fabremo atua na estratégia e na operação digital para gerar crescimento
-                  com mais previsibilidade. Neste portal, você acompanha os principais dados
-                  das campanhas de anúncios, a entrada de oportunidades e a evolução das vendas.
+                  A Fabremo atua na estratégia e na operação digital para gerar crescimento com mais
+                  previsibilidade. Neste portal, você acompanha os principais dados das campanhas de
+                  anúncios, a entrada de oportunidades e a evolução das vendas.
                 </p>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row">
@@ -135,8 +135,8 @@ export default function Home() {
               Um portal pensado para dar clareza ao que está sendo investido e ao que está voltando em resultado.
             </h2>
             <p className="max-w-2xl">
-              O cliente entende rapidamente quem é a Fabremo, entra com segurança no ambiente
-              e encontra uma visão objetiva sobre campanhas, performance comercial e próximos passos.
+              O cliente entende rapidamente quem é a Fabremo, entra com segurança no ambiente e
+              encontra uma visão objetiva sobre campanhas, performance comercial e próximos passos.
             </p>
           </div>
 

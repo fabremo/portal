@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { LoaderCircle, MessageSquareText } from "lucide-react";
@@ -101,7 +101,11 @@ export function MessagesReportContent({
       })
       .catch((error: unknown) => {
         if (isMounted) {
-          setReport(createMessagesErrorResult(error instanceof Error ? error.message : "Nao foi possivel carregar o relatorio de mensagens."));
+          setReport(
+            createMessagesErrorResult(
+              error instanceof Error ? error.message : "Não foi possível carregar o relatório de mensagens."
+            )
+          );
         }
       });
 
@@ -118,12 +122,12 @@ export function MessagesReportContent({
             <div className="space-y-3">
               <span className="inline-flex items-center gap-2 rounded-full border border-accent/15 bg-accent/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-accent">
                 <MessageSquareText className="h-3.5 w-3.5" />
-                Relatorio de mensagens
+                Relatório de mensagens
               </span>
               <div>
                 <h2 className="text-3xl font-semibold">Campanhas de mensagens</h2>
                 <p className="mt-2 max-w-3xl text-ink/72">
-                  Estamos consultando a Meta e reaproveitando os dados da sessao quando possivel.
+                  Estamos consultando a Meta e reaproveitando os dados da sessão quando possível.
                 </p>
               </div>
             </div>
@@ -145,9 +149,9 @@ export function MessagesReportContent({
     );
   }
 
-  const campaignRows = report.rows ?? [];
-  const dailyRows = report.dailyRows ?? [];
-  const adRows = report.adRows ?? [];
+  const campaignRows = report.rows;
+  const dailyRows = report.dailyRows;
+  const adRows = report.adRows;
   const lastCheckedAt = new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",
@@ -161,7 +165,7 @@ export function MessagesReportContent({
           <div className="space-y-3">
             <span className="inline-flex items-center gap-2 rounded-full border border-accent/15 bg-accent/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-accent">
               <MessageSquareText className="h-3.5 w-3.5" />
-              Relatorio de mensagens
+              Relatório de mensagens
             </span>
             <div>
               <h2 className="text-3xl font-semibold">Campanhas de mensagens</h2>
@@ -177,21 +181,21 @@ export function MessagesReportContent({
             </div>
           </div>
           <div className="rounded-2xl border border-black/5 bg-background px-5 py-4 text-sm text-ink/70">
-            Ultima consulta: {lastCheckedAt}
+            Última consulta: {lastCheckedAt}
           </div>
         </div>
       </header>
 
       {report.state === "error" || report.state === "not_configured" || report.state === "not_found" ? (
         <article className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-card md:p-8">
-          <h3 className="text-xl font-semibold">Nao foi possivel carregar o relatorio</h3>
+          <h3 className="text-xl font-semibold">Não foi possível carregar o relatório</h3>
           <p className="mt-3 text-sm">{report.message}</p>
         </article>
       ) : report.state === "empty" ? (
         <article className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-card md:p-8">
-          <h3 className="text-xl font-semibold">Sem dados no periodo</h3>
+          <h3 className="text-xl font-semibold">Sem dados no período</h3>
           <p className="mt-3 text-sm">
-            Existem campanhas com [WHATS], mas a Meta nao retornou dados para o intervalo selecionado.
+            Existem campanhas com [WHATS], mas a Meta não retornou dados para o intervalo selecionado.
           </p>
         </article>
       ) : (
@@ -211,7 +215,7 @@ export function MessagesReportContent({
                     <th className="px-6 py-4 font-semibold">Custo</th>
                     <th className="px-6 py-4 font-semibold">Mensagens</th>
                     <th className="px-6 py-4 font-semibold">Custo por mensagem</th>
-                    <th className="px-6 py-4 font-semibold">Impressoes</th>
+                    <th className="px-6 py-4 font-semibold">Impressões</th>
                     <th className="px-6 py-4 font-semibold">Cliques</th>
                     <th className="px-6 py-4 font-semibold">CTR%</th>
                     <th className="px-6 py-4 font-semibold">CPC</th>
@@ -239,7 +243,7 @@ export function MessagesReportContent({
             <div className="border-b border-gray-200 px-6 py-5">
               <h3 className="text-xl font-semibold">Tabela por dia</h3>
               <p className="mt-2 text-sm">
-                Veja o consolidado diario das campanhas de mensagens, do dia mais recente para o mais antigo.
+                Veja o consolidado diário das campanhas de mensagens, do dia mais recente para o mais antigo.
               </p>
             </div>
             <div className="overflow-x-auto">
@@ -250,7 +254,7 @@ export function MessagesReportContent({
                     <th className="px-6 py-4 font-semibold">Custo</th>
                     <th className="px-6 py-4 font-semibold">Mensagens</th>
                     <th className="px-6 py-4 font-semibold">Custo por mensagem</th>
-                    <th className="px-6 py-4 font-semibold">Impressoes</th>
+                    <th className="px-6 py-4 font-semibold">Impressões</th>
                     <th className="px-6 py-4 font-semibold">Cliques</th>
                     <th className="px-6 py-4 font-semibold">CTR%</th>
                     <th className="px-6 py-4 font-semibold">CPC</th>
@@ -276,16 +280,16 @@ export function MessagesReportContent({
 
           <article className="overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white shadow-card">
             <div className="border-b border-gray-200 px-6 py-5">
-              <h3 className="text-xl font-semibold">Tabela por anuncio</h3>
+              <h3 className="text-xl font-semibold">Tabela por anúncio</h3>
               <p className="mt-2 text-sm">
-                Consolide os anuncios pelo nome e priorize os que mais geraram mensagens no periodo.
+                Consolide os anúncios pelo nome e priorize os que mais geraram mensagens no período.
               </p>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-background text-left text-ink">
                   <tr>
-                    <th className="px-6 py-4 font-semibold">Nome do anuncio</th>
+                    <th className="px-6 py-4 font-semibold">Nome do anúncio</th>
                     <th className="px-6 py-4 font-semibold">Custo</th>
                     <th className="px-6 py-4 font-semibold">Mensagens</th>
                     <th className="px-6 py-4 font-semibold">CTR%</th>
@@ -313,4 +317,3 @@ export function MessagesReportContent({
     </section>
   );
 }
-

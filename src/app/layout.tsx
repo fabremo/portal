@@ -1,5 +1,7 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import type { ReactNode } from "react";
+
+import { SupabaseEmailLinkHandler } from "@/components/auth/supabase-email-link-handler";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -7,7 +9,7 @@ export const metadata: Metadata = {
     default: "Portal de Clientes",
     template: "%s | Portal de Clientes",
   },
-  description: "Portal de clientes com autenticacao, campanhas e indicadores de vendas.",
+  description: "Portal de clientes com autenticação, campanhas e indicadores de vendas.",
 };
 
 type RootLayoutProps = {
@@ -18,6 +20,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html data-scroll-behavior="smooth" lang="pt-BR">
       <body>
+        <SupabaseEmailLinkHandler />
         <div className="min-h-screen">
           {children}
           <footer className="border-t border-black/5 bg-background px-4 py-6 md:px-6 lg:px-8">

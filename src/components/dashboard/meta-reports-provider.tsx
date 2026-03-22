@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   createContext,
@@ -40,24 +40,24 @@ type SalesAdRow = {
 
 export type ClientSalesReportResult =
   | {
-    adRows: [];
-    dailyRows: [];
-    lastCheckedAt: string;
-    message: string;
-    rows: [];
-    since: string;
-    state: "not_configured" | "not_found" | "error";
-    until: string;
-  }
+      adRows: [];
+      dailyRows: [];
+      lastCheckedAt: string;
+      message: string;
+      rows: [];
+      since: string;
+      state: "not_configured" | "not_found" | "error";
+      until: string;
+    }
   | {
-    adRows: SalesAdRow[];
-    dailyRows: SalesDailyRow[];
-    lastCheckedAt: string;
-    rows: SalesRow[];
-    since: string;
-    state: "empty" | "ok";
-    until: string;
-  };
+      adRows: SalesAdRow[];
+      dailyRows: SalesDailyRow[];
+      lastCheckedAt: string;
+      rows: SalesRow[];
+      since: string;
+      state: "empty" | "ok";
+      until: string;
+    };
 
 type MessagesRow = {
   amountSpent: number;
@@ -93,26 +93,26 @@ type MessagesAdRow = {
 
 export type ClientMessagesReportResult =
   | {
-    adRows: [];
-    campaignLabel: string;
-    dailyRows: [];
-    lastCheckedAt: string;
-    message: string;
-    rows: [];
-    since: string;
-    state: "not_configured" | "not_found" | "error";
-    until: string;
-  }
+      adRows: [];
+      campaignLabel: string;
+      dailyRows: [];
+      lastCheckedAt: string;
+      message: string;
+      rows: [];
+      since: string;
+      state: "not_configured" | "not_found" | "error";
+      until: string;
+    }
   | {
-    adRows: MessagesAdRow[];
-    campaignLabel: string;
-    dailyRows: MessagesDailyRow[];
-    lastCheckedAt: string;
-    rows: MessagesRow[];
-    since: string;
-    state: "empty" | "ok";
-    until: string;
-  };
+      adRows: MessagesAdRow[];
+      campaignLabel: string;
+      dailyRows: MessagesDailyRow[];
+      lastCheckedAt: string;
+      rows: MessagesRow[];
+      since: string;
+      state: "empty" | "ok";
+      until: string;
+    };
 
 type MetaReportsContextValue = {
   getMessagesReport: (adAccountId: string) => Promise<ClientMessagesReportResult>;
@@ -163,15 +163,11 @@ function buildCacheKey(userId: string, adAccountId: string, kind: ReportKind) {
 function normalizeMessagesReport(report: ClientMessagesReportResult) {
   return {
     ...report,
-    adRows: Array.isArray((report as { adRows?: unknown }).adRows)
-      ? report.adRows
-      : [],
+    adRows: Array.isArray((report as { adRows?: unknown }).adRows) ? report.adRows : [],
     dailyRows: Array.isArray((report as { dailyRows?: unknown }).dailyRows)
       ? report.dailyRows
       : [],
-    rows: Array.isArray((report as { rows?: unknown }).rows)
-      ? report.rows
-      : [],
+    rows: Array.isArray((report as { rows?: unknown }).rows) ? report.rows : [],
   } as ClientMessagesReportResult;
 }
 
@@ -213,10 +209,10 @@ function writeSessionValue(key: string, value: unknown) {
 function createApiError(status: number, payload: ApiErrorResponse | null) {
   const fallbackMessage =
     status === 401
-      ? "Sua sessao expirou. Entre novamente para continuar."
+      ? "Sua sessão expirou. Entre novamente para continuar."
       : status === 403
-        ? "Voce nao tem acesso a esta conta de anuncios."
-        : "Nao foi possivel carregar o relatorio.";
+        ? "Você não tem acesso a esta conta de anúncios."
+        : "Não foi possível carregar o relatório.";
 
   return new Error(payload?.message || fallbackMessage);
 }
@@ -267,10 +263,12 @@ export function MetaReportsProvider({ children, userId }: MetaReportsProviderPro
         return inflightRequest as Promise<T>;
       }
 
-      const request = fetch(`/api/dashboard/reports/${kind}?adAccountId=${encodeURIComponent(adAccountId)}`,
+      const request = fetch(
+        `/api/dashboard/reports/${kind}?adAccountId=${encodeURIComponent(adAccountId)}`,
         {
           cache: "no-store",
-        })
+        }
+      )
         .then(async (response) => {
           const payload = (await response.json()) as T | ApiErrorResponse;
 

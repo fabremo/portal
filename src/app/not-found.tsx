@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { ArrowLeft, Compass, House, SearchX } from "lucide-react";
 
 const quickLinks = [
@@ -32,14 +32,14 @@ export default function NotFound() {
 
           <div className="mt-6 space-y-4">
             <p className="text-sm font-medium uppercase tracking-[0.24em] text-ink/48">
-              Pagina nao encontrada
+              Página não encontrada
             </p>
             <h1 className="max-w-3xl text-4xl font-semibold leading-tight md:text-6xl">
-              A rota que voce tentou acessar nao existe ou foi movida.
+              A rota que você tentou acessar não existe ou foi movida.
             </h1>
             <p className="max-w-2xl text-base text-ink/72 md:text-lg">
-              Confira o endereco digitado ou use um dos atalhos abaixo para voltar com rapidez
-              ao portal da Fabremo.
+              Confira o endereço digitado ou use um dos atalhos abaixo para voltar com rapidez ao
+              portal da Fabremo.
             </p>
           </div>
 
@@ -62,12 +62,12 @@ export default function NotFound() {
 
         <div className="grid gap-4">
           <article className="rounded-[2rem] border border-black/5 bg-ink p-6 text-white shadow-soft md:p-8">
-            <p className="text-xs uppercase tracking-[0.22em] text-white/55">Localizacao</p>
+            <p className="text-xs uppercase tracking-[0.22em] text-white/55">Localização</p>
             <div className="mt-4 flex items-end justify-between gap-4">
               <div>
                 <p className="text-6xl font-semibold leading-none">404</p>
                 <p className="mt-3 max-w-xs text-sm text-white/72">
-                  Esse endereco nao levou a uma pagina valida dentro do portal.
+                  Esse endereço não levou a uma página válida dentro do portal.
                 </p>
               </div>
               <div className="rounded-2xl bg-white/10 p-3">

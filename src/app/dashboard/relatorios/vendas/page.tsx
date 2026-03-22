@@ -1,10 +1,10 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 
 import { SalesReportContent } from "@/components/dashboard/sales-report-content";
 import { getDashboardAccessContext } from "@/lib/dashboard/access";
 
 export const metadata: Metadata = {
-  title: "Relatorio de Vendas",
+  title: "Relatório de Vendas",
 };
 
 export default async function SalesReportPage() {

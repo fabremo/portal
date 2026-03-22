@@ -1,15 +1,22 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { ArrowRight, KeyRound, LoaderCircle, LockKeyhole } from "lucide-react";
 
+import { clearMetaReportsSessionCache } from "@/components/dashboard/meta-reports-provider";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 const MIN_PASSWORD_LENGTH = 6;
 
-export function UpdatePasswordForm() {
+type PasswordFlow = "invite" | "recovery";
+
+type UpdatePasswordFormProps = {
+  flow: PasswordFlow;
+};
+
+export function UpdatePasswordForm({ flow }: UpdatePasswordFormProps) {
   const router = useRouter();
   const [supabase] = useState(createBrowserSupabaseClient);
   const [password, setPassword] = useState("");
@@ -19,6 +26,19 @@ export function UpdatePasswordForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(Boolean(supabase));
   const [canUpdatePassword, setCanUpdatePassword] = useState(false);
+
+  const environmentError = !supabase
+    ? "Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY para habilitar a autenticação."
+    : "";
+  const formTitle = flow === "invite" ? "Crie sua senha de acesso" : "Crie sua nova senha";
+  const formDescription =
+    flow === "invite"
+      ? "Use o link do convite para definir sua senha inicial e concluir a ativação da conta."
+      : "Use o link recebido por e-mail para definir uma nova senha e voltar ao portal com segurança.";
+  const invalidLinkMessage =
+    flow === "invite"
+      ? "Este link de convite é inválido ou expirou. Solicite um novo convite ao administrador."
+      : "Este link de recuperação é inválido ou expirou. Solicite um novo link na tela de login.";
 
   useEffect(() => {
     if (!supabase) {
@@ -41,7 +61,7 @@ export function UpdatePasswordForm() {
       setIsCheckingSession(false);
     }
 
-    syncRecoverySession();
+    void syncRecoverySession();
 
     const {
       data: { subscription },
@@ -74,14 +94,12 @@ export function UpdatePasswordForm() {
     }
 
     if (password !== confirmPassword) {
-      setError("A confirmacao da senha precisa ser igual a nova senha.");
+      setError("A confirmação da senha precisa ser igual à nova senha.");
       return;
     }
 
     if (!supabase) {
-      setError(
-        "Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY para habilitar a autenticacao."
-      );
+      setError(environmentError);
       return;
     }
 
@@ -92,22 +110,20 @@ export function UpdatePasswordForm() {
     });
 
     if (updateError) {
-      setError("Nao foi possivel atualizar a senha. Solicite um novo link e tente novamente.");
+      setError("Não foi possível salvar a senha. Solicite um novo link e tente novamente.");
       setIsLoading(false);
       return;
     }
 
-    setSuccess("Senha atualizada com sucesso. Voce ja pode entrar com a nova senha.");
+    clearMetaReportsSessionCache();
+    await supabase.auth.signOut();
+    setSuccess("Senha definida com sucesso. Faça login para continuar.");
     setPassword("");
     setConfirmPassword("");
     setIsLoading(false);
-    router.replace("/login");
+    router.replace("/login?skipRedirect=1&passwordUpdated=1");
     router.refresh();
   }
-
-  const environmentError = !supabase
-    ? "Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY para habilitar a autenticacao."
-    : "";
 
   const isSubmitDisabled =
     isLoading || isCheckingSession || !canUpdatePassword || Boolean(environmentError);
@@ -117,13 +133,11 @@ export function UpdatePasswordForm() {
       <div className="mb-8 space-y-3">
         <span className="inline-flex items-center gap-2 rounded-full border border-accent/15 bg-accent/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-accent">
           <KeyRound className="h-3.5 w-3.5" />
-          Atualizacao de senha
+          {flow === "invite" ? "Ativação da conta" : "Atualização de senha"}
         </span>
         <div className="space-y-2">
-          <h1 className="text-3xl font-semibold">Crie sua nova senha</h1>
-          <p>
-            Use o link recebido por e-mail para definir uma nova senha e voltar ao portal com seguranca.
-          </p>
+          <h1 className="text-3xl font-semibold">{formTitle}</h1>
+          <p>{formDescription}</p>
         </div>
       </div>
 
@@ -168,13 +182,13 @@ export function UpdatePasswordForm() {
 
         {isCheckingSession ? (
           <div className="rounded-xl border border-gray-200 bg-background px-4 py-3 text-sm text-ink/70">
-            Validando o link de recuperacao...
+            Validando o link seguro...
           </div>
         ) : null}
 
         {!environmentError && !isCheckingSession && !canUpdatePassword ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Este link de recuperacao e invalido ou expirou. Solicite um novo link na tela de login.
+            {invalidLinkMessage}
           </div>
         ) : null}
 
@@ -198,7 +212,7 @@ export function UpdatePasswordForm() {
           {isLoading ? (
             <>
               <LoaderCircle className="h-4 w-4 animate-spin" />
-              Atualizando senha...
+              Salvando senha...
             </>
           ) : (
             <>
@@ -211,12 +225,14 @@ export function UpdatePasswordForm() {
 
       <div className="mt-6 flex flex-col gap-4 text-sm">
         <p className="text-ink/55">
-          Se o link tiver expirado, volte para o login e solicite uma nova recuperacao de senha.
+          {flow === "invite"
+            ? "Se o convite tiver expirado, solicite um novo link ao administrador do portal."
+            : "Se o link tiver expirado, volte para o login e solicite uma nova recuperação de senha."}
         </p>
 
         <Link
           className="inline-flex font-medium text-accent transition hover:text-accent/80"
-          href="/login"
+          href="/login?skipRedirect=1"
         >
           Voltar para o login
         </Link>

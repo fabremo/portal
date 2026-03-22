@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { BellDot, DollarSign, ShoppingBag } from "lucide-react";
@@ -105,7 +105,11 @@ export function DashboardOverviewContent({
       })
       .catch((error: unknown) => {
         if (isMounted) {
-          setSalesReport(createSalesErrorResult(error instanceof Error ? error.message : "Nao foi possivel carregar os dados de vendas."));
+          setSalesReport(
+            createSalesErrorResult(
+              error instanceof Error ? error.message : "Não foi possível carregar os dados de vendas."
+            )
+          );
         }
       });
 
@@ -141,12 +145,12 @@ export function DashboardOverviewContent({
           <div className="space-y-2">
             <span className="inline-flex items-center gap-2 rounded-full border border-accent/15 bg-accent/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-accent">
               <BellDot className="h-3.5 w-3.5" />
-              Resumo da operacao
+              Resumo da operação
             </span>
             <div>
               <h2 className="text-3xl font-semibold">Visão geral do cliente</h2>
               <p className="mt-2 max-w-2xl">
-                Aqui voce acompanha o status da sua conta de anúncios e confirma qual conta esta
+                Aqui você acompanha o status da sua conta de anúncios e confirma qual conta está
                 ativa no portal.
               </p>
               <p className="mt-1 text-sm text-ink/70">
@@ -169,9 +173,7 @@ export function DashboardOverviewContent({
             <p className="mt-2 text-xl font-semibold">{facebookStatus.statusLabel}</p>
             <div className="mt-3 space-y-1 text-sm">
               <p>{facebookStatus.accountName}</p>
-              {shouldShowRawStatusCode ? (
-                <p>Codigo bruto: {facebookStatus.rawStatusCode ?? "N/A"}</p>
-              ) : null}
+              {shouldShowRawStatusCode ? <p>Código bruto: {facebookStatus.rawStatusCode ?? "N/A"}</p> : null}
               {facebookStatus.disableReasonText ? <p>Motivo: {facebookStatus.disableReasonText}</p> : null}
               <p>Última consulta: {lastCheckedAt}</p>
             </div>
@@ -189,7 +191,7 @@ export function DashboardOverviewContent({
               {totalPurchases !== null ? (
                 <p className="mt-4 text-4xl font-semibold text-ink">{formatNumber(totalPurchases)}</p>
               ) : salesReport ? (
-                <p className="mt-4 text-2xl font-semibold text-ink">Indisponivel</p>
+                <p className="mt-4 text-2xl font-semibold text-ink">Indisponível</p>
               ) : (
                 <p className="mt-4 text-2xl font-semibold text-ink/45">Carregando...</p>
               )}
@@ -215,13 +217,13 @@ export function DashboardOverviewContent({
               {totalAmountSpent !== null ? (
                 <p className="mt-4 text-4xl font-semibold text-ink">{formatCurrency(totalAmountSpent)}</p>
               ) : salesReport ? (
-                <p className="mt-4 text-2xl font-semibold text-ink">Indisponivel</p>
+                <p className="mt-4 text-2xl font-semibold text-ink">Indisponível</p>
               ) : (
                 <p className="mt-4 text-2xl font-semibold text-ink/45">Carregando...</p>
               )}
             </div>
             <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
-              <ShoppingBag className="h-5 w-5" />
+              <DollarSign className="h-5 w-5" />
             </span>
           </div>
 
@@ -235,4 +237,3 @@ export function DashboardOverviewContent({
     </section>
   );
 }
-

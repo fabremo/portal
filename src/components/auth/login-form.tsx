@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { ArrowRight, LoaderCircle, LockKeyhole, Mail } from "lucide-react";
 
@@ -21,11 +21,23 @@ const initialState: FormState = {
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [form, setForm] = useState<FormState>(initialState);
   const [mode, setMode] = useState<FormMode>("login");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const authError = searchParams.get("authError");
+  const passwordUpdated = searchParams.get("passwordUpdated");
+  const queryError =
+    authError === "invalid_or_expired"
+      ? "Este link de acesso é inválido ou expirou. Solicite um novo convite ou uma nova redefinição de senha."
+      : "";
+  const querySuccess =
+    passwordUpdated === "1"
+      ? "Senha definida com sucesso. Entre com seu e-mail e a nova senha para acessar o portal."
+      : "";
 
   function handleModeChange(nextMode: FormMode) {
     setMode(nextMode);
@@ -43,27 +55,27 @@ export function LoginForm() {
 
     if (!supabase) {
       setError(
-        "Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY para habilitar a autenticacao."
+        "Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY para habilitar a autenticação."
       );
       setIsLoading(false);
       return;
     }
 
     if (mode === "recovery") {
-      const redirectTo = `${window.location.origin}/login/atualizar-senha`;
+      const redirectToUrl = new URL("/auth/callback", window.location.origin);
+      redirectToUrl.searchParams.set("next", "/login/atualizar-senha?flow=recovery");
+
       const { error: recoveryError } = await supabase.auth.resetPasswordForEmail(form.email, {
-        redirectTo,
+        redirectTo: redirectToUrl.toString(),
       });
 
       if (recoveryError) {
-        setError("Nao foi possivel enviar o e-mail de recuperacao. Verifique o endereco informado.");
+        setError("Não foi possível enviar o e-mail de recuperação. Verifique o endereço informado.");
         setIsLoading(false);
         return;
       }
 
-      setSuccess(
-        "Se existir uma conta para este e-mail, enviamos um link para redefinir a senha."
-      );
+      setSuccess("Se existir uma conta para este e-mail, enviamos um link para redefinir a senha.");
       setIsLoading(false);
       return;
     }
@@ -74,7 +86,7 @@ export function LoginForm() {
     });
 
     if (signInError) {
-      setError("Nao foi possivel entrar. Verifique seu e-mail e sua senha.");
+      setError("Não foi possível entrar. Verifique seu e-mail e sua senha.");
       setIsLoading(false);
       return;
     }
@@ -87,7 +99,7 @@ export function LoginForm() {
     <div className="w-full max-w-md rounded-[2rem] border border-black/5 bg-surface p-8 shadow-soft sm:p-10">
       <div className="mb-8 space-y-3">
         <span className="inline-flex items-center rounded-full border border-brand/15 bg-brand/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-brand">
-          {mode === "login" ? "Acesso ao portal" : "Recuperacao de senha"}
+          {mode === "login" ? "Acesso ao portal" : "Recuperação de senha"}
         </span>
         <div className="space-y-2">
           <h1 className="text-3xl font-semibold">
@@ -154,11 +166,19 @@ export function LoginForm() {
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
           </div>
+        ) : queryError ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {queryError}
+          </div>
         ) : null}
 
         {success ? (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
             {success}
+          </div>
+        ) : querySuccess ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {querySuccess}
           </div>
         ) : null}
 
@@ -174,7 +194,7 @@ export function LoginForm() {
             </>
           ) : (
             <>
-              {mode === "login" ? "Entrar" : "Enviar link de recuperacao"}
+              {mode === "login" ? "Entrar" : "Enviar link de recuperação"}
               <ArrowRight className="h-4 w-4" />
             </>
           )}
@@ -193,15 +213,15 @@ export function LoginForm() {
         ) : null}
 
         <p className="text-ink/55">
-          Ainda esta configurando o projeto? Atualize as variaveis do Supabase no ambiente e
-          teste com um usuario criado no painel.
+          Ainda está configurando o projeto? Atualize as variáveis do Supabase no ambiente e teste
+          com um usuário criado no painel.
         </p>
 
         <Link
           className="inline-flex font-medium text-accent transition hover:text-accent/80"
           href="/"
         >
-          Voltar para a pagina inicial
+          Voltar para a página inicial
         </Link>
       </div>
     </div>

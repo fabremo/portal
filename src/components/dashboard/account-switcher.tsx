@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRef } from "react";
 import { usePathname } from "next/navigation";
@@ -22,7 +22,7 @@ export function AccountSwitcher({ accounts, activeAccountId }: AccountSwitcherPr
     <form action="/dashboard/select-account" className="space-y-2" method="post" ref={formRef}>
       <input name="redirectTo" type="hidden" value={pathname} />
       <label className="block text-xs uppercase tracking-[0.22em] text-white/55" htmlFor="adAccountId">
-        Conta de anuncio
+        Conta de anúncio
       </label>
       <select
         className="w-full rounded-xl border border-white/10 bg-white/8 px-3 py-2 text-sm text-white outline-none transition focus:border-white/25"
