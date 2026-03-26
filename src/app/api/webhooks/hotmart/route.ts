@@ -378,6 +378,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Payload JSON inválido." }, { status: 400 });
   }
 
+  // A Hotmart pode enviar o hottok no header ou embutido no corpo do webhook.
+  // Mantemos ambos os formatos para evitar falhas de autenticação entre ambientes/testes.
   const requestSecret =
     request.headers.get("hottok") ??
     request.headers.get("x-webhook-secret") ??

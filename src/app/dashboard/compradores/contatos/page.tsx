@@ -69,11 +69,7 @@ function formatPhone(phone: string | null, phoneCountryCode: string | null) {
     return "-";
   }
 
-  if (!phoneCountryCode) {
-    return phone;
-  }
-
-  return `+${phoneCountryCode} ${phone}`;
+  return phone;
 }
 
 function formatOrderBump(value: boolean | null) {
