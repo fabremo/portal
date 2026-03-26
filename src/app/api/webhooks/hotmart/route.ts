@@ -6,6 +6,7 @@ const webhookSecret = process.env.HOTMART_WEBHOOK_SECRET;
 const APPROVED_EVENT = "PURCHASE_APPROVED";
 
 type HotmartWebhookPayload = {
+  hottok?: string;
   id?: string;
   event?: string;
   creation_date?: number;
@@ -365,12 +366,6 @@ async function processApprovedPurchase(payload: HotmartWebhookPayload, webhookId
 }
 
 export async function POST(request: Request) {
-  const requestSecret = request.headers.get("hottok") ?? request.headers.get("x-webhook-secret");
-
-  if (!webhookSecret || requestSecret !== webhookSecret) {
-    return NextResponse.json({ message: "Não autorizado." }, { status: 401 });
-  }
-
   if (!isJsonRequest(request.headers.get("content-type"))) {
     return NextResponse.json({ message: "Payload JSON inválido." }, { status: 400 });
   }
@@ -381,6 +376,15 @@ export async function POST(request: Request) {
     payload = (await request.json()) as HotmartWebhookPayload;
   } catch {
     return NextResponse.json({ message: "Payload JSON inválido." }, { status: 400 });
+  }
+
+  const requestSecret =
+    request.headers.get("hottok") ??
+    request.headers.get("x-webhook-secret") ??
+    normalizeString(payload.hottok);
+
+  if (!webhookSecret || requestSecret !== webhookSecret) {
+    return NextResponse.json({ message: "Não autorizado." }, { status: 401 });
   }
 
   const insertData = buildWebhookLogInsert(payload);
