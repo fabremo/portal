@@ -1,10 +1,10 @@
 
 > portal-clientes@0.1.0 dev
-> next dev --hostname localhost --port 3001
+> next dev
 
 ▲ Next.js 16.2.0 (Turbopack)
 - Local:         http://localhost:3001
-- Network:       http://localhost:3001
+- Network:       http://192.168.7.5:3001
 - Environments: .env.local
-✓ Ready in 757ms
+✓ Ready in 844ms
 [?25h

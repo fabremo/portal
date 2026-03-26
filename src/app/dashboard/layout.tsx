@@ -1,10 +1,10 @@
-import type { ReactNode } from "react";
+﻿import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 
 import { NoAdAccountAccess } from "@/components/dashboard/no-ad-account-access";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { MetaReportsProvider } from "@/components/dashboard/meta-reports-provider";
-import { getDashboardAccessContext } from "@/lib/dashboard/access";
+import { canAccessBuyersModule, getDashboardAccessContext } from "@/lib/dashboard/access";
 
 type DashboardLayoutProps = {
   children: ReactNode;
@@ -24,6 +24,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
           <DashboardSidebar
             accessibleAccounts={accessContext.accessibleAccounts}
             activeAdAccount={accessContext.activeAdAccount}
+            canAccessBuyersModule={canAccessBuyersModule(accessContext.role)}
             isAdmin={accessContext.isAdmin}
             userEmail={accessContext.userEmail}
           />

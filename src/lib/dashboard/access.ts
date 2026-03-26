@@ -39,6 +39,10 @@ type ProfileRow = {
   role: string | null;
 };
 
+export function canAccessBuyersModule(role: UserRole) {
+  return role === "admin";
+}
+
 function resolveActiveAdAccount(
   accessibleAccounts: AccessibleAdAccount[],
   cookieAccountId?: string

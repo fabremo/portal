@@ -7,9 +7,12 @@ import {
   BarChart3,
   ChevronDown,
   ChevronRight,
+  ContactRound,
   FileText,
   MessageSquareText,
   Settings,
+  ShoppingCart,
+  Webhook,
 } from "lucide-react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
@@ -24,6 +27,7 @@ type AccessibleAdAccount = {
 type DashboardSidebarProps = {
   accessibleAccounts: AccessibleAdAccount[];
   activeAdAccount: AccessibleAdAccount | null;
+  canAccessBuyersModule: boolean;
   isAdmin: boolean;
   userEmail: string;
 };
@@ -46,17 +50,35 @@ const reportLinks = [
   },
 ];
 
+const buyersLinks = [
+  {
+    href: "/dashboard/compradores",
+    label: "Visão geral",
+  },
+  {
+    href: "/dashboard/compradores/contatos",
+    label: "Contatos",
+  },
+  {
+    href: "/dashboard/compradores/webhooks",
+    label: "Logs de webhook",
+  },
+];
+
 export function DashboardSidebar({
   accessibleAccounts,
   activeAdAccount,
+  canAccessBuyersModule,
   isAdmin,
   userEmail,
 }: DashboardSidebarProps) {
   const pathname = usePathname();
   const isOverviewActive = pathname === "/dashboard";
   const isReportsRoute = pathname.startsWith("/dashboard/relatorios");
+  const isBuyersModuleRoute = pathname.startsWith("/dashboard/compradores");
   const isSettingsActive = pathname === "/dashboard/configuracoes";
   const [isReportsExpanded, setIsReportsExpanded] = useState(isReportsRoute);
+  const [isBuyersExpanded, setIsBuyersExpanded] = useState(isBuyersModuleRoute);
 
   return (
     <aside className="flex flex-col rounded-[2rem] bg-ink p-6 text-white shadow-soft">
@@ -161,6 +183,59 @@ export function DashboardSidebar({
             </div>
           ) : null}
         </div>
+
+        {canAccessBuyersModule ? (
+          <div className="rounded-2xl border border-white/8 bg-white/4 px-2 py-2">
+            <button
+              className={[
+                "flex w-full items-center justify-between rounded-2xl px-2 py-2 text-sm",
+                isBuyersExpanded || isBuyersModuleRoute ? "text-white" : "text-white/74",
+              ].join(" ")}
+              onClick={() => setIsBuyersExpanded((current) => !current)}
+              type="button"
+            >
+              <span className="flex items-center gap-3">
+                <ShoppingCart className="h-4 w-4" />
+                Sistema de Compradores
+              </span>
+              <ChevronDown
+                className={[
+                  "h-4 w-4 transition",
+                  isBuyersExpanded || isBuyersModuleRoute ? "rotate-0" : "-rotate-90",
+                ].join(" ")}
+              />
+            </button>
+
+            {isBuyersExpanded || isBuyersModuleRoute ? (
+              <div className="mt-2 space-y-1 px-2 pb-1">
+                {buyersLinks.map(({ href, label }) => (
+                  <Link
+                    className={[
+                      "flex items-center justify-between rounded-xl px-3 py-2 text-sm transition",
+                      pathname === href
+                        ? "bg-white text-ink shadow-card"
+                        : "text-white/74 hover:bg-white/8 hover:text-white",
+                    ].join(" ")}
+                    href={href}
+                    key={label}
+                  >
+                    <span className="flex items-center gap-2">
+                      {href.endsWith("/webhooks") ? (
+                        <Webhook className="h-4 w-4" />
+                      ) : href.endsWith("/contatos") ? (
+                        <ContactRound className="h-4 w-4" />
+                      ) : (
+                        <ShoppingCart className="h-4 w-4" />
+                      )}
+                      {label}
+                    </span>
+                    <ChevronRight className="h-4 w-4" />
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {isAdmin ? (
           <Link
