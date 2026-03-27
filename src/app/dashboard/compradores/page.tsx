@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ContactRound, ShieldCheck, ShoppingCart, Webhook } from "lucide-react";
+import { BadgeCheck, ContactRound, ShieldCheck, ShoppingCart, Webhook } from "lucide-react";
 
 import { canAccessBuyersModule, getDashboardAccessContext } from "@/lib/dashboard/access";
 
@@ -16,7 +16,7 @@ export default async function DashboardBuyersPage() {
     redirect("/login");
   }
 
-  if (!canAccessBuyersModule(accessContext.role)) {
+  if (!canAccessBuyersModule(accessContext)) {
     redirect("/dashboard");
   }
 
@@ -32,13 +32,15 @@ export default async function DashboardBuyersPage() {
             <div>
               <h2 className="text-3xl font-semibold">Sistema de Compradores</h2>
               <p className="mt-2 max-w-3xl text-ink/72">
-                Acompanhe os registros recebidos da Hotmart e avance a estrutura do módulo com segurança.
+                Acompanhe os registros recebidos da Hotmart dentro do escopo das empresas acessíveis na sua sessão.
               </p>
             </div>
           </div>
           <div className="inline-flex items-center gap-3 rounded-2xl border border-black/5 bg-background px-5 py-4 text-sm text-ink/70">
             <ShoppingCart className="h-4 w-4 text-accent" />
-            Somente usuários autorizados
+            {accessContext.isAdmin
+              ? "Visão administrativa completa"
+              : `${accessContext.accessibleCompanies.length} ${accessContext.accessibleCompanies.length === 1 ? "empresa liberada" : "empresas liberadas"}`}
           </div>
         </div>
       </header>
@@ -47,7 +49,7 @@ export default async function DashboardBuyersPage() {
         <article className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-card md:p-8">
           <h3 className="text-xl font-semibold">Consultas do módulo</h3>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-ink/72">
-            Acesse os contatos já incluídos e acompanhe os webhooks recebidos para validar a entrada dos dados do módulo de compradores.
+            Acesse os contatos já incluídos e acompanhe os webhooks recebidos para validar a entrada dos dados do módulo de compradores em cada empresa.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
@@ -68,10 +70,23 @@ export default async function DashboardBuyersPage() {
         </article>
 
         <aside className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-card md:p-8">
-          <h3 className="text-lg font-semibold">Etapa atual</h3>
+          <h3 className="text-lg font-semibold">Escopo atual</h3>
           <p className="mt-3 text-sm leading-6 text-ink/72">
-            Nesta fase, o módulo já permite consultar contatos e visualizar múltiplas compras por pessoa, além de conferir os logs de entrada.
+            O módulo já aplica contexto de empresa para produtos Hotmart, compras, contatos vinculados e logs operacionais do webhook.
           </p>
+          {!accessContext.isAdmin ? (
+            <div className="mt-5 space-y-2">
+              {accessContext.accessibleCompanies.map((company) => (
+                <div
+                  className="inline-flex w-full items-center gap-2 rounded-2xl border border-accent/15 bg-accent/8 px-4 py-3 text-sm text-accent"
+                  key={company.id}
+                >
+                  <BadgeCheck className="h-4 w-4" />
+                  {company.name}
+                </div>
+              ))}
+            </div>
+          ) : null}
         </aside>
       </div>
     </section>

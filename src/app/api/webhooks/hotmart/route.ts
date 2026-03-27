@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 import { createServiceRoleSupabaseClient, hasServiceRoleSupabaseEnv } from "@/lib/supabase/service-role";
 
@@ -83,12 +83,13 @@ type HotmartWebhookPayload = {
 };
 
 type WebhookLogInsert = {
-  webhook_id: string;
-  event: string;
-  creation_date: string | null;
-  transaction: string | null;
   buyer_email: string | null;
+  company_id: string | null;
+  creation_date: string | null;
+  event: string;
   payload: HotmartWebhookPayload;
+  transaction: string | null;
+  webhook_id: string;
 };
 
 type ContactUpsert = {
@@ -117,6 +118,7 @@ type PurchaseUpsert = {
   chargeback_date?: string | null;
   checkout_country_iso: string | null;
   checkout_country_name: string | null;
+  company_id: string;
   contact_id: string;
   full_price_currency: string | null;
   full_price_value: number | null;
@@ -147,6 +149,16 @@ type PurchaseUpsert = {
 type RequiredPurchaseFields = {
   buyerEmail: string;
   productName: string;
+  transaction: string;
+};
+
+type ResolvedCompany = {
+  companyId: string;
+  source: "product_id" | "product_ucode";
+};
+
+type PurchaseLifecycleRow = {
+  company_id: string | null;
   transaction: string;
 };
 
@@ -187,18 +199,19 @@ function normalizeIsoDate(value: string | undefined) {
   return Number.isNaN(parsedDate.getTime()) ? null : parsedDate.toISOString();
 }
 
-function buildWebhookLogInsert(payload: HotmartWebhookPayload): WebhookLogInsert | null {
+function buildWebhookLogInsert(payload: HotmartWebhookPayload, companyId: string | null): WebhookLogInsert | null {
   if (!payload.id || !payload.event) {
     return null;
   }
 
   return {
-    webhook_id: payload.id,
-    event: payload.event,
-    creation_date: normalizeEpochDate(payload.creation_date),
-    transaction: normalizeString(payload.data?.purchase?.transaction),
     buyer_email: normalizeString(payload.data?.buyer?.email),
+    company_id: companyId,
+    creation_date: normalizeEpochDate(payload.creation_date),
+    event: payload.event,
     payload,
+    transaction: normalizeString(payload.data?.purchase?.transaction),
+    webhook_id: payload.id,
   };
 }
 
@@ -260,6 +273,7 @@ function buildContactUpsert(payload: HotmartWebhookPayload, buyerEmail: string):
 
 function buildPurchaseUpsert(
   payload: HotmartWebhookPayload,
+  companyId: string,
   contactId: string,
   webhookId: string,
   requiredFields: RequiredPurchaseFields
@@ -272,6 +286,7 @@ function buildPurchaseUpsert(
     business_model: normalizeString(purchase?.business_model),
     checkout_country_iso: normalizeString(purchase?.checkout_country?.iso),
     checkout_country_name: normalizeString(purchase?.checkout_country?.name),
+    company_id: companyId,
     contact_id: contactId,
     full_price_currency: normalizeString(purchase?.full_price?.currency_value),
     full_price_value: normalizeNumber(purchase?.full_price?.value),
@@ -300,6 +315,60 @@ function buildPurchaseUpsert(
     warranty_date: normalizeIsoDate(product?.warranty_date),
     xcod: normalizeString(purchase?.origin?.xcod),
   };
+}
+
+async function resolveCompanyFromProduct(payload: HotmartWebhookPayload): Promise<ResolvedCompany | null> {
+  const supabase = createServiceRoleSupabaseClient();
+
+  if (!supabase) {
+    throw new Error("Configuração do Supabase incompleta.");
+  }
+
+  const hotmartProductId = normalizeNumber(payload.data?.product?.id);
+
+  if (hotmartProductId !== null) {
+    const { data, error } = await supabase
+      .from("company_products")
+      .select("company_id")
+      .eq("hotmart_product_id", hotmartProductId)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error("Não foi possível resolver a empresa pelo ID do produto Hotmart.");
+    }
+
+    if (data?.company_id) {
+      return {
+        companyId: data.company_id as string,
+        source: "product_id",
+      };
+    }
+  }
+
+  const hotmartProductUcode = normalizeString(payload.data?.product?.ucode);
+
+  if (hotmartProductUcode) {
+    const { data, error } = await supabase
+      .from("company_products")
+      .select("company_id")
+      .eq("hotmart_product_ucode", hotmartProductUcode)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error("Não foi possível resolver a empresa pelo ucode do produto Hotmart.");
+    }
+
+    if (data?.company_id) {
+      return {
+        companyId: data.company_id as string,
+        source: "product_ucode",
+      };
+    }
+  }
+
+  return null;
 }
 
 async function setWebhookProcessingState(
@@ -335,8 +404,31 @@ async function upsertContact(payload: HotmartWebhookPayload, buyerEmail: string)
   return data.id as string;
 }
 
+async function upsertCompanyContact(companyId: string, contactId: string) {
+  const supabase = createServiceRoleSupabaseClient();
+
+  if (!supabase) {
+    throw new Error("Configuração do Supabase incompleta.");
+  }
+
+  const { error } = await supabase.from("company_contacts").upsert(
+    {
+      company_id: companyId,
+      contact_id: contactId,
+    },
+    {
+      onConflict: "company_id,contact_id",
+    }
+  );
+
+  if (error) {
+    throw new Error("Não foi possível vincular o contato à empresa.");
+  }
+}
+
 async function upsertPurchase(
   payload: HotmartWebhookPayload,
+  companyId: string,
   contactId: string,
   webhookId: string,
   requiredFields: RequiredPurchaseFields
@@ -349,7 +441,7 @@ async function upsertPurchase(
 
   const { error } = await supabase
     .from("purchases")
-    .upsert(buildPurchaseUpsert(payload, contactId, webhookId, requiredFields), {
+    .upsert(buildPurchaseUpsert(payload, companyId, contactId, webhookId, requiredFields), {
       onConflict: "transaction",
     });
 
@@ -358,7 +450,11 @@ async function upsertPurchase(
   }
 }
 
-async function processApprovedPurchase(payload: HotmartWebhookPayload, webhookId: string) {
+async function processApprovedPurchase(payload: HotmartWebhookPayload, webhookId: string, companyId: string | null) {
+  if (!companyId) {
+    throw new Error("Produto Hotmart não cadastrado ou inativo. Não foi possível identificar a empresa da compra.");
+  }
+
   const requiredFields = getRequiredPurchaseFields(payload);
 
   if (!requiredFields) {
@@ -366,13 +462,15 @@ async function processApprovedPurchase(payload: HotmartWebhookPayload, webhookId
   }
 
   const contactId = await upsertContact(payload, requiredFields.buyerEmail);
-  await upsertPurchase(payload, contactId, webhookId, requiredFields);
+  await upsertCompanyContact(companyId, contactId);
+  await upsertPurchase(payload, companyId, contactId, webhookId, requiredFields);
 }
 
 async function updatePurchaseLifecycleEvent(
   payload: HotmartWebhookPayload,
   webhookId: string,
-  event: typeof REFUNDED_EVENT | typeof CHARGEBACK_EVENT
+  event: typeof REFUNDED_EVENT | typeof CHARGEBACK_EVENT,
+  resolvedCompanyId: string | null
 ) {
   const supabase = createServiceRoleSupabaseClient();
 
@@ -396,36 +494,47 @@ async function updatePurchaseLifecycleEvent(
     normalizeString(payload.data?.purchase?.status) ??
     (event === REFUNDED_EVENT ? "REFUNDED" : "CHARGEBACK");
 
+  const existingPurchaseResponse = await supabase
+    .from("purchases")
+    .select("transaction, company_id")
+    .eq("transaction", transaction)
+    .maybeSingle();
+
+  if (existingPurchaseResponse.error) {
+    throw new Error("Não foi possível localizar a compra para atualizar o evento recebido.");
+  }
+
+  const existingPurchase = existingPurchaseResponse.data as PurchaseLifecycleRow | null;
+
+  if (!existingPurchase?.transaction) {
+    throw new Error("Compra não encontrada para atualizar o evento recebido.");
+  }
+
+  const nextCompanyId = existingPurchase.company_id ?? resolvedCompanyId;
   const updatePayload =
     event === REFUNDED_EVENT
       ? {
+          company_id: nextCompanyId,
+          hotmart_webhook_id: webhookId,
           refunded_date: eventDate,
           status: nextStatus,
         }
       : {
           chargeback_date: eventDate,
+          company_id: nextCompanyId,
+          hotmart_webhook_id: webhookId,
           status: nextStatus,
         };
 
-  const { data, error } = await supabase
-    .from("purchases")
-    .update(updatePayload)
-    .eq("transaction", transaction)
-    .select("transaction")
-    .maybeSingle();
+  const { error } = await supabase.from("purchases").update(updatePayload).eq("transaction", transaction);
 
   if (error) {
     throw new Error("Não foi possível atualizar a compra.");
   }
 
-  if (!data?.transaction) {
-    throw new Error("Compra não encontrada para atualizar o evento recebido.");
+  if (nextCompanyId) {
+    await supabase.from("webhook_logs").update({ company_id: nextCompanyId }).eq("webhook_id", webhookId);
   }
-
-  await supabase
-    .from("purchases")
-    .update({ hotmart_webhook_id: webhookId })
-    .eq("transaction", transaction);
 }
 
 export async function POST(request: Request) {
@@ -441,8 +550,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Payload JSON inválido." }, { status: 400 });
   }
 
-  // A Hotmart pode enviar o hottok no header ou embutido no corpo do webhook.
-  // Mantemos ambos os formatos para evitar falhas de autenticação entre ambientes/testes.
   const requestSecret =
     request.headers.get("hottok") ??
     request.headers.get("x-webhook-secret") ??
@@ -450,12 +557,6 @@ export async function POST(request: Request) {
 
   if (!webhookSecret || requestSecret !== webhookSecret) {
     return NextResponse.json({ message: "Não autorizado." }, { status: 401 });
-  }
-
-  const insertData = buildWebhookLogInsert(payload);
-
-  if (!insertData) {
-    return NextResponse.json({ message: "Campos obrigatórios ausentes." }, { status: 400 });
   }
 
   if (!hasServiceRoleSupabaseEnv) {
@@ -466,6 +567,22 @@ export async function POST(request: Request) {
 
   if (!supabase) {
     return NextResponse.json({ message: "Configuração do Supabase incompleta." }, { status: 500 });
+  }
+
+  let resolvedCompany: ResolvedCompany | null = null;
+
+  try {
+    resolvedCompany = await resolveCompanyFromProduct(payload);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Erro ao resolver a empresa pelo produto Hotmart.";
+
+    return NextResponse.json({ message }, { status: 500 });
+  }
+
+  const insertData = buildWebhookLogInsert(payload, resolvedCompany?.companyId ?? null);
+
+  if (!insertData) {
+    return NextResponse.json({ message: "Campos obrigatórios ausentes." }, { status: 400 });
   }
 
   const { error } = await supabase.from("webhook_logs").insert(insertData);
@@ -480,9 +597,14 @@ export async function POST(request: Request) {
 
   try {
     if (insertData.event === APPROVED_EVENT) {
-      await processApprovedPurchase(payload, insertData.webhook_id);
+      await processApprovedPurchase(payload, insertData.webhook_id, resolvedCompany?.companyId ?? null);
     } else if (insertData.event === REFUNDED_EVENT || insertData.event === CHARGEBACK_EVENT) {
-      await updatePurchaseLifecycleEvent(payload, insertData.webhook_id, insertData.event);
+      await updatePurchaseLifecycleEvent(
+        payload,
+        insertData.webhook_id,
+        insertData.event,
+        resolvedCompany?.companyId ?? null
+      );
     } else {
       return NextResponse.json({ message: "Webhook registrado com sucesso." }, { status: 201 });
     }
@@ -504,3 +626,4 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ message: "Webhook registrado e compra processada com sucesso." }, { status: 201 });
 }
+

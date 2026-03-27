@@ -137,3 +137,77 @@ alter table public.purchases enable row level security;
 alter table public.purchases
 add column refunded_date timestamptz,
 add column chargeback_date timestamptz;
+
+create table public.companies (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  slug text not null unique,
+  created_at timestamptz not null default now()
+);
+
+create table public.user_companies (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  company_id uuid not null references public.companies(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (user_id, company_id)
+);
+
+create index idx_user_companies_company_id
+  on public.user_companies (company_id);
+
+create table public.company_products (
+  id uuid primary key default gen_random_uuid(),
+
+  company_id uuid not null references public.companies(id) on delete cascade,
+
+  hotmart_product_id bigint not null unique,
+  hotmart_product_ucode text,
+  product_name text not null,
+
+  is_active boolean not null default true,
+
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index idx_company_products_company_id
+  on public.company_products (company_id);
+
+create index idx_company_products_hotmart_product_ucode
+  on public.company_products (hotmart_product_ucode);
+
+alter table public.webhook_logs
+add column company_id uuid references public.companies(id);
+
+create index idx_webhook_logs_company_id
+  on public.webhook_logs (company_id);
+
+alter table public.purchases
+add column company_id uuid references public.companies(id);
+
+create index idx_purchases_company_id
+  on public.purchases (company_id);
+
+create table public.company_contacts (
+  id uuid primary key default gen_random_uuid(),
+
+  company_id uuid not null references public.companies(id) on delete cascade,
+  contact_id uuid not null references public.contacts(id) on delete cascade,
+
+  created_at timestamptz not null default now(),
+
+  unique (company_id, contact_id)
+);
+
+create index idx_company_contacts_company_id
+  on public.company_contacts (company_id);
+
+create index idx_company_contacts_contact_id
+  on public.company_contacts (contact_id);
+
+
+alter table public.companies enable row level security;
+alter table public.user_companies enable row level security;
+alter table public.company_products enable row level security;
+alter table public.company_contacts enable row level security;

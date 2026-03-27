@@ -1,29 +1,43 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { AlertCircle, CheckCircle2, ChevronDown, Database, Webhook } from "lucide-react";
+import { AlertCircle, BadgeCheck, CheckCircle2, ChevronDown, Database, Webhook } from "lucide-react";
 
 import { canAccessBuyersModule, getDashboardAccessContext } from "@/lib/dashboard/access";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/service-role";
 
+type JoinedCompanyRow = {
+  name: string | null;
+};
+
 type WebhookLogRow = {
-  id: string;
-  webhook_id: string;
-  event: string;
-  creation_date: string | null;
-  transaction: string | null;
   buyer_email: string | null;
+  companies: JoinedCompanyRow[] | JoinedCompanyRow | null;
+  company_id: string | null;
+  created_at: string;
+  creation_date: string | null;
+  event: string;
+  id: string;
+  payload: unknown;
   processed: boolean;
   processing_error: string | null;
-  created_at: string;
-  payload: unknown;
+  transaction: string | null;
+  webhook_id: string;
 };
 
 const WEBHOOK_ROW_GRID_CLASS =
-  "grid min-w-[1100px] grid-cols-[minmax(220px,1.45fr)_minmax(160px,1fr)_minmax(240px,1.2fr)_150px_150px_160px_72px] items-start";
+  "grid min-w-[1280px] grid-cols-[minmax(210px,1.25fr)_minmax(180px,1fr)_minmax(180px,1fr)_minmax(240px,1.2fr)_150px_150px_160px_72px] items-start";
 
 export const metadata: Metadata = {
   title: "Logs de webhook",
 };
+
+function getJoinedCompany(row: WebhookLogRow) {
+  if (Array.isArray(row.companies)) {
+    return row.companies[0] ?? null;
+  }
+
+  return row.companies;
+}
 
 function formatDateTime(value: string | null) {
   if (!value) {
@@ -69,20 +83,41 @@ function renderProcessingStatus(log: WebhookLogRow) {
   );
 }
 
-async function getWebhookLogs() {
+async function getWebhookLogs(accessContext: Awaited<ReturnType<typeof getDashboardAccessContext>>) {
   const supabase = createServiceRoleSupabaseClient();
 
   if (!supabase) {
     throw new Error("Configuração do Supabase incompleta.");
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("webhook_logs")
     .select(
-      "id, webhook_id, event, creation_date, transaction, buyer_email, processed, processing_error, created_at, payload"
+      `
+      id,
+      webhook_id,
+      event,
+      creation_date,
+      transaction,
+      buyer_email,
+      company_id,
+      processed,
+      processing_error,
+      created_at,
+      payload,
+      companies (
+        name
+      )
+    `
     )
     .order("created_at", { ascending: false })
     .limit(50);
+
+  if (accessContext && !accessContext.isAdmin) {
+    query = query.in("company_id", accessContext.accessibleCompanyIds);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error("Não foi possível carregar os logs de webhook.");
@@ -98,11 +133,11 @@ export default async function DashboardWebhookLogsPage() {
     redirect("/login");
   }
 
-  if (!canAccessBuyersModule(accessContext.role)) {
+  if (!canAccessBuyersModule(accessContext)) {
     redirect("/dashboard");
   }
 
-  const logs = await getWebhookLogs();
+  const logs = await getWebhookLogs(accessContext);
 
   return (
     <section className="space-y-6">
@@ -116,7 +151,7 @@ export default async function DashboardWebhookLogsPage() {
             <div>
               <h2 className="text-3xl font-semibold">Logs de webhook</h2>
               <p className="mt-2 max-w-3xl text-ink/72">
-                Consulta dos 50 registros mais recentes salvos na tabela <code>webhook_logs</code>.
+                Consulta dos 50 registros mais recentes salvos na tabela <code>webhook_logs</code>, já com o contexto de empresa quando o produto Hotmart é reconhecido.
               </p>
             </div>
           </div>
@@ -129,9 +164,10 @@ export default async function DashboardWebhookLogsPage() {
 
       <article className="overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white shadow-card">
         <div className="overflow-x-auto">
-          <div className="min-w-[1100px] divide-y divide-gray-200 text-sm">
+          <div className="min-w-[1280px] divide-y divide-gray-200 text-sm">
             <div className={`${WEBHOOK_ROW_GRID_CLASS} bg-ink/[0.03] text-left text-xs uppercase tracking-[0.18em] text-ink/55`}>
               <div className="px-5 py-4 font-semibold">Evento</div>
+              <div className="px-5 py-4 font-semibold">Empresa</div>
               <div className="px-5 py-4 font-semibold">Transação</div>
               <div className="px-5 py-4 font-semibold">E-mail</div>
               <div className="px-5 py-4 font-semibold">Criação Hotmart</div>
@@ -142,37 +178,56 @@ export default async function DashboardWebhookLogsPage() {
 
             <div className="divide-y divide-gray-100">
               {logs.length ? (
-                logs.map((log) => (
-                  <details className="group w-full" key={log.id}>
-                    <summary className={`${WEBHOOK_ROW_GRID_CLASS} cursor-pointer list-none transition hover:bg-black/[0.015]`}>
-                      <div className="min-w-0 px-5 py-4">
-                        <p className="font-medium text-ink">{log.event}</p>
-                        <p className="mt-1 break-all text-xs text-ink/55">{log.webhook_id}</p>
-                      </div>
-                      <div className="min-w-0 px-5 py-4 text-ink/72">{log.transaction ?? "-"}</div>
-                      <div className="min-w-0 px-5 py-4 text-ink/72">{log.buyer_email ?? "-"}</div>
-                      <div className="px-5 py-4 text-ink/72">{formatDateTime(log.creation_date)}</div>
-                      <div className="px-5 py-4 text-ink/72">{formatDateTime(log.created_at)}</div>
-                      <div className="px-5 py-4">{renderProcessingStatus(log)}</div>
-                      <div className="flex justify-end px-5 py-4">
-                        <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-ink/55 transition group-open:border-accent/30 group-open:text-accent">
-                          <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
-                        </span>
-                      </div>
-                    </summary>
+                logs.map((log) => {
+                  const companyName = getJoinedCompany(log)?.name ?? null;
 
-                    <div className="border-t border-gray-100 px-5 pb-5 pt-4">
-                      <div className="w-full rounded-2xl border border-gray-200 bg-background/80 p-4 md:p-5">
-                        <pre className="overflow-x-auto rounded-2xl bg-ink px-4 py-4 text-xs leading-6 text-white/88">
-                          {JSON.stringify(log.payload, null, 2)}
-                        </pre>
+                  return (
+                    <details className="group w-full" key={log.id}>
+                      <summary className={`${WEBHOOK_ROW_GRID_CLASS} cursor-pointer list-none transition hover:bg-black/[0.015]`}>
+                        <div className="min-w-0 px-5 py-4">
+                          <p className="font-medium text-ink">{log.event}</p>
+                          <p className="mt-1 break-all text-xs text-ink/55">{log.webhook_id}</p>
+                        </div>
+                        <div className="min-w-0 px-5 py-4 text-ink/72">
+                          {companyName ? (
+                            <span className="inline-flex items-center gap-2 rounded-full border border-accent/15 bg-accent/8 px-3 py-1 text-xs font-medium text-accent">
+                              <BadgeCheck className="h-3.5 w-3.5" />
+                              {companyName}
+                            </span>
+                          ) : (
+                            "-"
+                          )}
+                        </div>
+                        <div className="min-w-0 px-5 py-4 text-ink/72">{log.transaction ?? "-"}</div>
+                        <div className="min-w-0 px-5 py-4 text-ink/72">{log.buyer_email ?? "-"}</div>
+                        <div className="px-5 py-4 text-ink/72">{formatDateTime(log.creation_date)}</div>
+                        <div className="px-5 py-4 text-ink/72">{formatDateTime(log.created_at)}</div>
+                        <div className="px-5 py-4">{renderProcessingStatus(log)}</div>
+                        <div className="flex justify-end px-5 py-4">
+                          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-ink/55 transition group-open:border-accent/30 group-open:text-accent">
+                            <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
+                          </span>
+                        </div>
+                      </summary>
+
+                      <div className="border-t border-gray-100 px-5 pb-5 pt-4">
+                        <div className="w-full rounded-2xl border border-gray-200 bg-background/80 p-4 md:p-5">
+                          {log.processing_error ? (
+                            <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                              {log.processing_error}
+                            </div>
+                          ) : null}
+                          <pre className="overflow-x-auto rounded-2xl bg-ink px-4 py-4 text-xs leading-6 text-white/88">
+                            {JSON.stringify(log.payload, null, 2)}
+                          </pre>
+                        </div>
                       </div>
-                    </div>
-                  </details>
-                ))
+                    </details>
+                  );
+                })
               ) : (
                 <div className="px-5 py-10 text-center text-sm text-ink/60">
-                  Nenhum webhook foi registrado até o momento.
+                  Nenhum webhook foi registrado até o momento para as empresas acessíveis nesta sessão.
                 </div>
               )}
             </div>

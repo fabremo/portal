@@ -3,6 +3,7 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
 
+import { createServiceRoleSupabaseClient } from "@/lib/supabase/service-role";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const ACTIVE_AD_ACCOUNT_COOKIE_NAME = "portal_active_ad_account";
@@ -14,8 +15,16 @@ export type AccessibleAdAccount = {
   name: string;
 };
 
+export type AccessibleCompany = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
 export type DashboardAccessContext = {
   accessibleAccounts: AccessibleAdAccount[];
+  accessibleCompanies: AccessibleCompany[];
+  accessibleCompanyIds: string[];
   activeAdAccount: AccessibleAdAccount | null;
   isAdmin: boolean;
   role: UserRole;
@@ -39,8 +48,20 @@ type ProfileRow = {
   role: string | null;
 };
 
-export function canAccessBuyersModule(role: UserRole) {
-  return role === "admin";
+type CompanyRow = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+type UserCompanyRow = {
+  companies: CompanyRow[] | CompanyRow | null;
+};
+
+export function canAccessBuyersModule(
+  accessContext: Pick<DashboardAccessContext, "accessibleCompanyIds" | "isAdmin">
+) {
+  return accessContext.isAdmin || accessContext.accessibleCompanyIds.length > 0;
 }
 
 function resolveActiveAdAccount(
@@ -74,6 +95,14 @@ function getJoinedAdAccount(row: UserAdAccountRow) {
   return row.ad_accounts;
 }
 
+function getJoinedCompany(row: UserCompanyRow) {
+  if (Array.isArray(row.companies)) {
+    return row.companies[0] ?? null;
+  }
+
+  return row.companies;
+}
+
 function normalizeRole(role: string | null | undefined): UserRole {
   return role === "admin" ? "admin" : "common";
 }
@@ -82,11 +111,7 @@ async function resolveUserRole(
   supabase: NonNullable<Awaited<ReturnType<typeof createServerSupabaseClient>>>,
   userId: string
 ) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .maybeSingle();
+  const { data, error } = await supabase.from("profiles").select("role").eq("id", userId).maybeSingle();
 
   if (error) {
     return "common" satisfies UserRole;
@@ -122,6 +147,58 @@ function mapAdminAccounts(data: JoinedAdAccount[]) {
       name: account.name || "Conta sem nome",
     }))
     .sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
+}
+
+async function resolveAccessibleCompanies(isAdmin: boolean, userId: string) {
+  const supabase = createServiceRoleSupabaseClient();
+
+  if (!supabase) {
+    return [] as AccessibleCompany[];
+  }
+
+  if (isAdmin) {
+    const { data, error } = await supabase.from("companies").select("id, name, slug").order("name", { ascending: true });
+
+    if (error) {
+      throw new Error("Não foi possível carregar as empresas disponíveis para o usuário.");
+    }
+
+    return ((data ?? []) as CompanyRow[]).map((company) => ({
+      id: company.id,
+      name: company.name,
+      slug: company.slug,
+    }));
+  }
+
+  const { data, error } = await supabase
+    .from("user_companies")
+    .select(
+      `
+      companies!inner (
+        id,
+        name,
+        slug
+      )
+    `
+    )
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error("Não foi possível carregar as empresas disponíveis para o usuário.");
+  }
+
+  const companies = ((data ?? []) as UserCompanyRow[])
+    .map((row) => getJoinedCompany(row))
+    .filter((company): company is CompanyRow => Boolean(company?.id))
+    .map((company) => ({
+      id: company.id,
+      name: company.name,
+      slug: company.slug,
+    }));
+
+  const uniqueCompanies = Array.from(new Map(companies.map((company) => [company.id, company])).values());
+
+  return uniqueCompanies.sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
 }
 
 export const getDashboardAccessContext = cache(async (): Promise<DashboardAccessContext | null> => {
@@ -160,7 +237,10 @@ export const getDashboardAccessContext = cache(async (): Promise<DashboardAccess
         .eq("is_active", true)
         .eq("ad_accounts.is_active", true);
 
-  const { data, error } = await accountQuery;
+  const [{ data, error }, accessibleCompanies] = await Promise.all([
+    accountQuery,
+    resolveAccessibleCompanies(isAdmin, user.id),
+  ]);
 
   if (error) {
     throw new Error("Não foi possível carregar as contas de anúncio do usuário.");
@@ -175,6 +255,8 @@ export const getDashboardAccessContext = cache(async (): Promise<DashboardAccess
 
   return {
     accessibleAccounts,
+    accessibleCompanies,
+    accessibleCompanyIds: accessibleCompanies.map((company) => company.id),
     activeAdAccount: resolveActiveAdAccount(accessibleAccounts, cookieAccountId),
     isAdmin,
     role,
