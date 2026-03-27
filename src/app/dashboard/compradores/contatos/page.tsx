@@ -1,6 +1,6 @@
 ﻿import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { ChevronDown, ContactRound, CreditCard, ShoppingBag } from "lucide-react";
+import { AlertCircle, ChevronDown, ContactRound, CreditCard, ShoppingBag } from "lucide-react";
 
 import { canAccessBuyersModule, getDashboardAccessContext } from "@/lib/dashboard/access";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/service-role";
@@ -78,6 +78,27 @@ function formatOrderBump(value: boolean | null) {
   }
 
   return value ? "Sim" : "Não";
+}
+
+function renderPurchaseStatusBadge(status: string) {
+  const normalizedStatus = status.trim().toUpperCase();
+  const isNegativeStatus = normalizedStatus === "REFUNDED" || normalizedStatus === "CHARGEBACK";
+
+  if (isNegativeStatus) {
+    return (
+      <span className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-700">
+        <AlertCircle className="h-3.5 w-3.5" />
+        {status}
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+      <CreditCard className="h-3.5 w-3.5" />
+      {status}
+    </span>
+  );
 }
 
 function sortPurchases(purchases: PurchaseRow[] | null | undefined) {
@@ -234,10 +255,7 @@ export default async function DashboardBuyersContactsPage() {
                                       <p className="font-medium text-ink">{purchase.product_name}</p>
                                       <p className="text-sm text-ink/72">Transação: {purchase.transaction}</p>
                                     </div>
-                                    <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-                                      <CreditCard className="h-3.5 w-3.5" />
-                                      {purchase.status}
-                                    </span>
+                                    {renderPurchaseStatusBadge(purchase.status)}
                                   </div>
 
                                   <div className="mt-4 grid gap-3 text-sm text-ink/72 md:grid-cols-2 xl:grid-cols-4">

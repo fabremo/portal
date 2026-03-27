@@ -4,6 +4,8 @@ import { createServiceRoleSupabaseClient, hasServiceRoleSupabaseEnv } from "@/li
 
 const webhookSecret = process.env.HOTMART_WEBHOOK_SECRET;
 const APPROVED_EVENT = "PURCHASE_APPROVED";
+const REFUNDED_EVENT = "PURCHASE_REFUNDED";
+const CHARGEBACK_EVENT = "PURCHASE_CHARGEBACK";
 
 type HotmartWebhookPayload = {
   hottok?: string;
@@ -112,6 +114,7 @@ type ContactUpsert = {
 type PurchaseUpsert = {
   approved_date: string | null;
   business_model: string | null;
+  chargeback_date?: string | null;
   checkout_country_iso: string | null;
   checkout_country_name: string | null;
   contact_id: string;
@@ -133,6 +136,7 @@ type PurchaseUpsert = {
   product_id: number | null;
   product_name: string;
   product_ucode: string | null;
+  refunded_date?: string | null;
   sck: string | null;
   status: string;
   transaction: string;
@@ -365,6 +369,65 @@ async function processApprovedPurchase(payload: HotmartWebhookPayload, webhookId
   await upsertPurchase(payload, contactId, webhookId, requiredFields);
 }
 
+async function updatePurchaseLifecycleEvent(
+  payload: HotmartWebhookPayload,
+  webhookId: string,
+  event: typeof REFUNDED_EVENT | typeof CHARGEBACK_EVENT
+) {
+  const supabase = createServiceRoleSupabaseClient();
+
+  if (!supabase) {
+    throw new Error("Configuração do Supabase incompleta.");
+  }
+
+  const transaction = normalizeString(payload.data?.purchase?.transaction);
+
+  if (!transaction) {
+    throw new Error("Webhook sem transação para atualizar a compra.");
+  }
+
+  const eventDate = normalizeEpochDate(payload.creation_date);
+
+  if (!eventDate) {
+    throw new Error("Webhook sem creation_date válido para atualizar a compra.");
+  }
+
+  const nextStatus =
+    normalizeString(payload.data?.purchase?.status) ??
+    (event === REFUNDED_EVENT ? "REFUNDED" : "CHARGEBACK");
+
+  const updatePayload =
+    event === REFUNDED_EVENT
+      ? {
+          refunded_date: eventDate,
+          status: nextStatus,
+        }
+      : {
+          chargeback_date: eventDate,
+          status: nextStatus,
+        };
+
+  const { data, error } = await supabase
+    .from("purchases")
+    .update(updatePayload)
+    .eq("transaction", transaction)
+    .select("transaction")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Não foi possível atualizar a compra.");
+  }
+
+  if (!data?.transaction) {
+    throw new Error("Compra não encontrada para atualizar o evento recebido.");
+  }
+
+  await supabase
+    .from("purchases")
+    .update({ hotmart_webhook_id: webhookId })
+    .eq("transaction", transaction);
+}
+
 export async function POST(request: Request) {
   if (!isJsonRequest(request.headers.get("content-type"))) {
     return NextResponse.json({ message: "Payload JSON inválido." }, { status: 400 });
@@ -415,12 +478,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Erro ao registrar webhook." }, { status: 500 });
   }
 
-  if (insertData.event !== APPROVED_EVENT) {
-    return NextResponse.json({ message: "Webhook registrado com sucesso." }, { status: 201 });
-  }
-
   try {
-    await processApprovedPurchase(payload, insertData.webhook_id);
+    if (insertData.event === APPROVED_EVENT) {
+      await processApprovedPurchase(payload, insertData.webhook_id);
+    } else if (insertData.event === REFUNDED_EVENT || insertData.event === CHARGEBACK_EVENT) {
+      await updatePurchaseLifecycleEvent(payload, insertData.webhook_id, insertData.event);
+    } else {
+      return NextResponse.json({ message: "Webhook registrado com sucesso." }, { status: 201 });
+    }
+
     await setWebhookProcessingState(insertData.webhook_id, {
       processed: true,
       processing_error: null,

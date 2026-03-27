@@ -133,3 +133,7 @@ create index idx_purchases_sck
 alter table public.webhook_logs enable row level security;
 alter table public.contacts enable row level security;
 alter table public.purchases enable row level security;
+
+alter table public.purchases
+add column refunded_date timestamptz,
+add column chargeback_date timestamptz;
