@@ -8,6 +8,8 @@ import {
   type PropsWithChildren,
 } from "react";
 
+import { getSalesDateRange, type SalesDatePreset } from "@/lib/facebook/sales-date-range";
+
 const META_REPORT_CACHE_PREFIX = "meta-report";
 
 type SalesRow = {
@@ -116,7 +118,10 @@ export type ClientMessagesReportResult =
 
 type MetaReportsContextValue = {
   getMessagesReport: (adAccountId: string) => Promise<ClientMessagesReportResult>;
-  getSalesReport: (adAccountId: string) => Promise<ClientSalesReportResult>;
+  getSalesReport: (
+    adAccountId: string,
+    preset?: SalesDatePreset
+  ) => Promise<ClientSalesReportResult>;
 };
 
 type ApiErrorResponse = {
@@ -131,33 +136,14 @@ type ReportKind = "messages" | "sales";
 
 const MetaReportsContext = createContext<MetaReportsContextValue | null>(null);
 
-function getDateRange() {
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
-
-  const until = new Date(today);
-  until.setDate(today.getDate() - 1);
-
-  const since = new Date(until);
-  since.setDate(until.getDate() - 6);
-
-  const format = (value: Date) => {
-    const year = value.getFullYear();
-    const month = String(value.getMonth() + 1).padStart(2, "0");
-    const day = String(value.getDate()).padStart(2, "0");
-
-    return `${year}-${month}-${day}`;
-  };
-
-  return {
-    since: format(since),
-    until: format(until),
-  };
-}
-
-function buildCacheKey(userId: string, adAccountId: string, kind: ReportKind) {
-  const { since, until } = getDateRange();
-  return `${META_REPORT_CACHE_PREFIX}:${userId}:${adAccountId}:${kind}:${since}:${until}`;
+function buildCacheKey(
+  userId: string,
+  adAccountId: string,
+  kind: ReportKind,
+  preset: SalesDatePreset = "last_7_days"
+) {
+  const { since, until } = getSalesDateRange(preset);
+  return `${META_REPORT_CACHE_PREFIX}:${userId}:${adAccountId}:${kind}:${preset}:${since}:${until}`;
 }
 
 function normalizeMessagesReport(report: ClientMessagesReportResult) {
@@ -240,8 +226,12 @@ export function MetaReportsProvider({ children, userId }: MetaReportsProviderPro
   const inflightRequestsRef = useRef(new Map<string, Promise<unknown>>());
 
   const contextValue = useMemo<MetaReportsContextValue>(() => {
-    async function loadReport<T>(kind: ReportKind, adAccountId: string) {
-      const cacheKey = buildCacheKey(userId, adAccountId, kind);
+    async function loadReport<T>(
+      kind: ReportKind,
+      adAccountId: string,
+      preset: SalesDatePreset = "last_7_days"
+    ) {
+      const cacheKey = buildCacheKey(userId, adAccountId, kind, preset);
       const memoryValue = memoryCacheRef.current.get(cacheKey);
 
       if (memoryValue) {
@@ -264,7 +254,7 @@ export function MetaReportsProvider({ children, userId }: MetaReportsProviderPro
       }
 
       const request = fetch(
-        `/api/dashboard/reports/${kind}?adAccountId=${encodeURIComponent(adAccountId)}`,
+        `/api/dashboard/reports/${kind}?adAccountId=${encodeURIComponent(adAccountId)}&preset=${encodeURIComponent(preset)}`,
         {
           cache: "no-store",
         }
@@ -294,8 +284,8 @@ export function MetaReportsProvider({ children, userId }: MetaReportsProviderPro
     return {
       getMessagesReport: (adAccountId: string) =>
         loadReport<ClientMessagesReportResult>("messages", adAccountId),
-      getSalesReport: (adAccountId: string) =>
-        loadReport<ClientSalesReportResult>("sales", adAccountId),
+      getSalesReport: (adAccountId: string, preset = "last_7_days") =>
+        loadReport<ClientSalesReportResult>("sales", adAccountId, preset),
     };
   }, [userId]);
 

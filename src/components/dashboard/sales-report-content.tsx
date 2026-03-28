@@ -7,11 +7,21 @@ import {
   type ClientSalesReportResult,
   useMetaReports,
 } from "@/components/dashboard/meta-reports-provider";
+import {
+  getSalesDateRange,
+  type SalesDatePreset,
+} from "@/lib/facebook/sales-date-range";
 
 type SalesReportContentProps = {
   activeAdAccountName: string;
   adAccountId: string;
 };
+
+const SALES_PERIOD_OPTIONS: Array<{ label: string; preset: SalesDatePreset }> = [
+  { label: "7 dias", preset: "last_7_days" },
+  { label: "Este mês", preset: "current_month" },
+  { label: "Mês anterior", preset: "previous_month" },
+];
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -50,32 +60,11 @@ function formatRoas(value: number | null) {
   }).format(value)}x`;
 }
 
-function getDateRange() {
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
-
-  const until = new Date(today);
-  until.setDate(today.getDate() - 1);
-
-  const since = new Date(until);
-  since.setDate(until.getDate() - 6);
-
-  const format = (value: Date) => {
-    const year = value.getFullYear();
-    const month = String(value.getMonth() + 1).padStart(2, "0");
-    const day = String(value.getDate()).padStart(2, "0");
-
-    return `${year}-${month}-${day}`;
-  };
-
-  return {
-    since: format(since),
-    until: format(until),
-  };
-}
-
-function createSalesErrorResult(message: string): ClientSalesReportResult {
-  const { since, until } = getDateRange();
+function createSalesErrorResult(
+  message: string,
+  preset: SalesDatePreset
+): ClientSalesReportResult {
+  const { since, until } = getSalesDateRange(preset);
 
   return {
     adRows: [],
@@ -89,14 +78,50 @@ function createSalesErrorResult(message: string): ClientSalesReportResult {
   };
 }
 
+function renderPresetButtons(
+  selectedPreset: SalesDatePreset,
+  onSelect: (preset: SalesDatePreset) => void
+) {
+  return SALES_PERIOD_OPTIONS.map((option) => {
+    const isActive = option.preset === selectedPreset;
+
+    return (
+      <button
+        aria-pressed={isActive}
+        className={[
+          "rounded-full border px-4 py-2 text-sm font-medium transition",
+          isActive
+            ? "border-accent bg-accent text-white shadow-card"
+            : "border-black/10 bg-white text-ink/75 hover:border-accent/40 hover:text-ink",
+        ].join(" ")}
+        key={option.preset}
+        onClick={() => onSelect(option.preset)}
+        type="button"
+      >
+        {option.label}
+      </button>
+    );
+  });
+}
+
 export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesReportContentProps) {
   const { getSalesReport } = useMetaReports();
+  const [selectedPreset, setSelectedPreset] = useState<SalesDatePreset>("last_7_days");
   const [report, setReport] = useState<ClientSalesReportResult | null>(null);
+
+  function handlePresetSelect(preset: SalesDatePreset) {
+    if (preset === selectedPreset) {
+      return;
+    }
+
+    setReport(null);
+    setSelectedPreset(preset);
+  }
 
   useEffect(() => {
     let isMounted = true;
 
-    getSalesReport(adAccountId)
+    getSalesReport(adAccountId, selectedPreset)
       .then((nextReport) => {
         if (isMounted) {
           setReport(nextReport);
@@ -106,7 +131,8 @@ export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesRe
         if (isMounted) {
           setReport(
             createSalesErrorResult(
-              error instanceof Error ? error.message : "Não foi possível carregar o relatório de vendas."
+              error instanceof Error ? error.message : "Não foi possível carregar o relatório de vendas.",
+              selectedPreset
             )
           );
         }
@@ -115,7 +141,7 @@ export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesRe
     return () => {
       isMounted = false;
     };
-  }, [adAccountId, getSalesReport]);
+  }, [adAccountId, getSalesReport, selectedPreset]);
 
   if (!report) {
     return (
@@ -134,9 +160,14 @@ export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesRe
                 </p>
               </div>
             </div>
-            <div className="inline-flex items-center gap-3 rounded-2xl border border-black/5 bg-background px-5 py-4 text-sm text-ink/70">
-              <LoaderCircle className="h-4 w-4 animate-spin text-accent" />
-              Buscando dados...
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <div className="flex flex-wrap gap-2">
+                {renderPresetButtons(selectedPreset, handlePresetSelect)}
+              </div>
+              <div className="inline-flex items-center gap-3 rounded-2xl border border-black/5 bg-background px-5 py-4 text-sm text-ink/70">
+                <LoaderCircle className="h-4 w-4 animate-spin text-accent" />
+                Buscando dados...
+              </div>
             </div>
           </div>
         </header>
@@ -177,7 +208,10 @@ export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesRe
               <p className="mt-1 text-sm text-ink/70">
                 Conta ativa: <span className="font-medium text-ink">{activeAdAccountName}</span>
               </p>
-              <p className="mt-1 text-sm text-ink/70">
+              <div className="mt-4 flex flex-wrap gap-2">
+                {renderPresetButtons(selectedPreset, handlePresetSelect)}
+              </div>
+              <p className="mt-3 text-sm text-ink/70">
                 Intervalo utilizado: <span className="font-medium text-ink">{dateRangeLabel}</span>
               </p>
             </div>

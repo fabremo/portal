@@ -7,6 +7,7 @@ import {
   type ClientSalesReportResult,
   useMetaReports,
 } from "@/components/dashboard/meta-reports-provider";
+import { getSalesDateRange } from "@/lib/facebook/sales-date-range";
 
 type FacebookStatusTone = "success" | "warning" | "danger" | "neutral";
 
@@ -47,32 +48,8 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat("pt-BR").format(value);
 }
 
-function getDateRange() {
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
-
-  const until = new Date(today);
-  until.setDate(today.getDate() - 1);
-
-  const since = new Date(until);
-  since.setDate(until.getDate() - 6);
-
-  const format = (value: Date) => {
-    const year = value.getFullYear();
-    const month = String(value.getMonth() + 1).padStart(2, "0");
-    const day = String(value.getDate()).padStart(2, "0");
-
-    return `${year}-${month}-${day}`;
-  };
-
-  return {
-    since: format(since),
-    until: format(until),
-  };
-}
-
 function createSalesErrorResult(message: string): ClientSalesReportResult {
-  const { since, until } = getDateRange();
+  const { since, until } = getSalesDateRange();
 
   return {
     adRows: [],
