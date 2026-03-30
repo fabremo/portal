@@ -11,7 +11,10 @@
   payload jsonb not null,
 
   processed boolean not null default false,
+  processing_attempts integer not null default 0,
   processing_error text,
+  last_processing_attempt_at timestamptz,
+  last_processing_success_at timestamptz,
 
   created_at timestamptz not null default now()
 );
@@ -211,3 +214,8 @@ alter table public.companies enable row level security;
 alter table public.user_companies enable row level security;
 alter table public.company_products enable row level security;
 alter table public.company_contacts enable row level security;
+
+alter table public.webhook_logs
+add column if not exists processing_attempts integer not null default 0,
+add column if not exists last_processing_attempt_at timestamptz,
+add column if not exists last_processing_success_at timestamptz;
