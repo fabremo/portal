@@ -47,8 +47,10 @@ async function ensureWebhookReprocessingAccess() {
 }
 
 async function loadWebhookLog(formData: FormData) {
-  const recordId = typeof formData.get("webhookLogId") === "string" ? formData.get("webhookLogId")?.trim() : "";
-  const webhookId = typeof formData.get("webhookId") === "string" ? formData.get("webhookId")?.trim() : "";
+  const recordIdEntry = formData.get("webhookLogId");
+  const webhookIdEntry = formData.get("webhookId");
+  const recordId = typeof recordIdEntry === "string" ? recordIdEntry.trim() : "";
+  const webhookId = typeof webhookIdEntry === "string" ? webhookIdEntry.trim() : "";
 
   if (!recordId && !webhookId) {
     redirectToWebhookLogs({
