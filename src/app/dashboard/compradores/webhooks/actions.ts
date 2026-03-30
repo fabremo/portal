@@ -8,8 +8,8 @@ import {
   HotmartWebhookPayload,
   markWebhookReprocessingAttempt,
   processWebhookLog,
-  setWebhookProcessingState,
-} from "@/lib/buyers/hotmart-webhook";
+  registerWebhookReprocessingFailure,
+} from "@/lib/buyers/hotmart-webhook-processing";
 import { getDashboardAccessContext } from "@/lib/dashboard/access";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/service-role";
 
@@ -126,29 +126,12 @@ export async function reprocessWebhookLogAction(formData: FormData) {
 
   try {
     await markWebhookReprocessingAttempt(log.webhook_id);
-    const result = await processWebhookLog(log.payload, log.webhook_id);
-
-    if (!result.handled) {
-      await setWebhookProcessingState(log.webhook_id, {
-        processed: false,
-        processing_error: "Este evento não possui rotina de reprocessamento no momento.",
-      });
-
-      revalidatePath(WEBHOOK_LOGS_PATH);
-      redirectToWebhookLogs({
-        message: "Este evento não possui rotina de reprocessamento no momento.",
-        status: "error",
-      });
-    }
-
+    await processWebhookLog(log.payload, log.webhook_id);
     await completeWebhookReprocessingSuccess(log.webhook_id);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro ao reprocessar webhook.";
 
-    await setWebhookProcessingState(log.webhook_id, {
-      processed: false,
-      processing_error: message,
-    });
+    await registerWebhookReprocessingFailure(log.webhook_id, message);
 
     revalidatePath(WEBHOOK_LOGS_PATH);
     redirectToWebhookLogs({

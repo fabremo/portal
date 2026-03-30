@@ -2,19 +2,21 @@
 
 import {
   buildWebhookLogInsert,
-  completeWebhookReprocessingSuccess,
+  completeInitialWebhookSuccess,
+  getWebhookStageError,
   HotmartWebhookPayload,
   isJsonRequest,
   processWebhookLog,
-  resolveCompanyFromProduct,
+  registerInitialWebhookFailure,
   resolveWebhookSecret,
-  setWebhookProcessingState,
-} from "@/lib/buyers/hotmart-webhook";
+} from "@/lib/buyers/hotmart-webhook-processing";
 import { createServiceRoleSupabaseClient, hasServiceRoleSupabaseEnv } from "@/lib/supabase/service-role";
 
 const webhookSecret = process.env.HOTMART_WEBHOOK_SECRET;
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
+
   if (!isJsonRequest(request.headers.get("content-type"))) {
     return NextResponse.json({ message: "Payload JSON inválido." }, { status: 400 });
   }
@@ -43,18 +45,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Configuração do Supabase incompleta." }, { status: 500 });
   }
 
-  let resolvedCompanyId: string | null = null;
-
-  try {
-    const resolvedCompany = await resolveCompanyFromProduct(payload);
-    resolvedCompanyId = resolvedCompany?.companyId ?? null;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Erro ao resolver a empresa pelo produto Hotmart.";
-
-    return NextResponse.json({ message }, { status: 500 });
-  }
-
-  const insertData = buildWebhookLogInsert(payload, resolvedCompanyId);
+  const insertData = buildWebhookLogInsert(payload, null);
 
   if (!insertData) {
     return NextResponse.json({ message: "Campos obrigatórios ausentes." }, { status: 400 });
@@ -71,23 +62,19 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await processWebhookLog(payload, insertData.webhook_id);
-
-    if (!result.handled) {
-      return NextResponse.json({ message: "Webhook registrado com sucesso." }, { status: 201 });
-    }
-
-    await completeWebhookReprocessingSuccess(insertData.webhook_id);
+    await processWebhookLog(payload, insertData.webhook_id);
+    await completeInitialWebhookSuccess(insertData.webhook_id, Date.now() - startedAt);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Erro ao processar webhook.";
+    const stageError = getWebhookStageError(error, "process_approved");
 
-    await setWebhookProcessingState(insertData.webhook_id, {
-      processed: false,
-      processing_error: message,
+    await registerInitialWebhookFailure(insertData.webhook_id, {
+      durationMs: Date.now() - startedAt,
+      message: stageError.message,
+      stage: stageError.stage,
     });
 
-    return NextResponse.json({ message }, { status: 500 });
+    return NextResponse.json({ message: stageError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ message: "Webhook registrado e compra processada com sucesso." }, { status: 201 });
+  return NextResponse.json({ message: "Webhook registrado e processado com sucesso." }, { status: 200 });
 }

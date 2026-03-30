@@ -1,15 +1,18 @@
 ﻿"use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   BarChart3,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ContactRound,
   FileText,
   MessageSquareText,
+  PanelLeft,
   Settings,
   ShoppingCart,
   Webhook,
@@ -29,10 +32,18 @@ type DashboardSidebarProps = {
   activeAdAccount: AccessibleAdAccount | null;
   canAccessBuyersModule: boolean;
   isAdmin: boolean;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
   userEmail: string;
 };
 
-const reportLinks = [
+type GroupLink = {
+  disabled?: boolean;
+  href: string;
+  label: string;
+};
+
+const reportLinks: GroupLink[] = [
   {
     disabled: true,
     href: "#",
@@ -50,7 +61,7 @@ const reportLinks = [
   },
 ];
 
-const buyersLinks = [
+const buyersLinks: GroupLink[] = [
   {
     href: "/dashboard/compradores",
     label: "Visão geral",
@@ -65,11 +76,119 @@ const buyersLinks = [
   },
 ];
 
+function getLinkIcon(href: string, label: string) {
+  if (href === "/dashboard") {
+    return <BarChart3 className="h-4 w-4 shrink-0" />;
+  }
+
+  if (href.endsWith("/mensagens")) {
+    return <MessageSquareText className="h-4 w-4 shrink-0" />;
+  }
+
+  if (href.endsWith("/webhooks")) {
+    return <Webhook className="h-4 w-4 shrink-0" />;
+  }
+
+  if (href.endsWith("/contatos")) {
+    return <ContactRound className="h-4 w-4 shrink-0" />;
+  }
+
+  if (href.startsWith("/dashboard/compradores")) {
+    return <ShoppingCart className="h-4 w-4 shrink-0" />;
+  }
+
+  if (href.startsWith("/dashboard/relatorios")) {
+    return <BarChart3 className="h-4 w-4 shrink-0" />;
+  }
+
+  if (label === "Relatórios") {
+    return <FileText className="h-4 w-4 shrink-0" />;
+  }
+
+  return <Settings className="h-4 w-4 shrink-0" />;
+}
+
+function renderNavLink({
+  href,
+  icon,
+  isActive,
+  isCollapsed,
+  label,
+}: {
+  href: string;
+  icon: ReactNode;
+  isActive: boolean;
+  isCollapsed: boolean;
+  label: string;
+}) {
+  return (
+    <Link
+      className={[
+        "flex items-center rounded-2xl text-sm transition",
+        isCollapsed ? "justify-center px-3 py-3" : "justify-between px-4 py-3",
+        isActive ? "bg-white text-ink shadow-card" : "text-white/74 hover:bg-white/8 hover:text-white",
+      ].join(" ")}
+      href={href}
+      title={isCollapsed ? label : undefined}
+    >
+      <span className={["flex items-center", isCollapsed ? "justify-center" : "gap-3"].join(" ")}>
+        {icon}
+        {!isCollapsed ? label : <span className="sr-only">{label}</span>}
+      </span>
+      {!isCollapsed ? <ChevronRight className="h-4 w-4 shrink-0" /> : null}
+    </Link>
+  );
+}
+
+function renderGroupButton({
+  icon,
+  isCollapsed,
+  isExpanded,
+  isRouteActive,
+  label,
+  onClick,
+}: {
+  icon: ReactNode;
+  isCollapsed: boolean;
+  isExpanded: boolean;
+  isRouteActive: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={[
+        "flex w-full items-center rounded-2xl text-sm transition",
+        isCollapsed ? "justify-center px-3 py-3" : "justify-between px-2 py-2",
+        isExpanded || isRouteActive ? "text-white" : "text-white/74 hover:text-white",
+      ].join(" ")}
+      onClick={onClick}
+      title={isCollapsed ? label : undefined}
+      type="button"
+    >
+      <span className={["flex items-center", isCollapsed ? "justify-center" : "gap-3"].join(" ")}>
+        {icon}
+        {!isCollapsed ? label : <span className="sr-only">{label}</span>}
+      </span>
+      {!isCollapsed ? (
+        <ChevronDown
+          className={[
+            "h-4 w-4 transition",
+            isExpanded || isRouteActive ? "rotate-0" : "-rotate-90",
+          ].join(" ")}
+        />
+      ) : null}
+    </button>
+  );
+}
+
 export function DashboardSidebar({
   accessibleAccounts,
   activeAdAccount,
   canAccessBuyersModule,
   isAdmin,
+  isCollapsed,
+  onToggleCollapse,
   userEmail,
 }: DashboardSidebarProps) {
   const pathname = usePathname();
@@ -81,17 +200,58 @@ export function DashboardSidebar({
   const [isBuyersExpanded, setIsBuyersExpanded] = useState(isBuyersModuleRoute);
 
   return (
-    <aside className="flex flex-col rounded-[2rem] bg-ink p-6 text-white shadow-soft">
-      <div className="rounded-2xl border border-white/10 bg-white/6 p-5">
-        <p className="text-xs uppercase tracking-[0.26em] text-white/55">Portal de clientes</p>
-        <h1 className="mt-3 text-2xl font-semibold text-white">Painel do cliente</h1>
-        <p className="mt-2 text-sm leading-6 text-white/68">
-          Visualize campanhas, oportunidades e indicadores de vendas com leitura rápida.
-        </p>
+    <aside
+      className={[
+        "flex h-full flex-col rounded-[2rem] bg-ink text-white shadow-soft transition-all duration-300",
+        isCollapsed ? "p-3" : "p-6",
+      ].join(" ")}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div
+          className={[
+            "rounded-2xl border border-white/10 bg-white/6 transition-all duration-300",
+            isCollapsed ? "flex h-14 w-14 items-center justify-center p-0" : "flex-1 p-5",
+          ].join(" ")}
+        >
+          {isCollapsed ? (
+            <PanelLeft className="h-5 w-5 text-white" />
+          ) : (
+            <>
+              <p className="text-xs uppercase tracking-[0.26em] text-white/55">Portal de clientes</p>
+              <h1 className="mt-3 text-2xl font-semibold text-white">Painel do cliente</h1>
+              <p className="mt-2 text-sm leading-6 text-white/68">
+                Visualize campanhas, oportunidades e indicadores de vendas com leitura rápida.
+              </p>
+            </>
+          )}
+        </div>
+
+        <button
+          className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/6 text-white/74 transition hover:bg-white/10 hover:text-white"
+          onClick={onToggleCollapse}
+          title={isCollapsed ? "Expandir menu" : "Retrair menu"}
+          type="button"
+        >
+          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </button>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-white/10 bg-white/6 p-5">
-        {accessibleAccounts.length > 1 && activeAdAccount ? (
+      <div
+        className={[
+          "mt-6 rounded-2xl border border-white/10 bg-white/6 transition-all duration-300",
+          isCollapsed ? "p-3" : "p-5",
+        ].join(" ")}
+      >
+        {isCollapsed ? (
+          <div className="flex justify-center">
+            <div
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/8 text-sm font-medium text-white"
+              title={activeAdAccount ? activeAdAccount.name : "Nenhuma conta liberada"}
+            >
+              {(activeAdAccount?.name ?? "-").slice(0, 1).toUpperCase()}
+            </div>
+          </div>
+        ) : accessibleAccounts.length > 1 && activeAdAccount ? (
           <AccountSwitcher accounts={accessibleAccounts} activeAccountId={activeAdAccount.id} />
         ) : activeAdAccount ? (
           <div className="space-y-2">
@@ -106,45 +266,40 @@ export function DashboardSidebar({
         )}
       </div>
 
-      <nav className="mt-8 space-y-2">
-        <Link
+      <nav className={["mt-8 space-y-2", isCollapsed ? "flex flex-col items-center" : ""].join(" ")}>
+        <div className={isCollapsed ? "w-full" : undefined}>
+          {renderNavLink({
+            href: "/dashboard",
+            icon: getLinkIcon("/dashboard", "Visão geral"),
+            isActive: isOverviewActive,
+            isCollapsed,
+            label: "Visão geral",
+          })}
+        </div>
+
+        <div
           className={[
-            "flex items-center justify-between rounded-2xl px-4 py-3 text-sm transition",
-            isOverviewActive
-              ? "bg-white text-ink shadow-card"
-              : "text-white/74 hover:bg-white/8 hover:text-white",
+            "rounded-2xl border border-white/8 bg-white/4",
+            isCollapsed ? "w-full px-0 py-0" : "px-2 py-2",
           ].join(" ")}
-          href="/dashboard"
         >
-          <span className="flex items-center gap-3">
-            <BarChart3 className="h-4 w-4" />
-            Visão geral
-          </span>
-          <ChevronRight className="h-4 w-4" />
-        </Link>
+          {renderGroupButton({
+            icon: <FileText className="h-4 w-4 shrink-0" />,
+            isCollapsed,
+            isExpanded: isReportsExpanded,
+            isRouteActive: isReportsRoute,
+            label: "Relatórios",
+            onClick: () => {
+              if (isCollapsed) {
+                onToggleCollapse();
+                return;
+              }
 
-        <div className="rounded-2xl border border-white/8 bg-white/4 px-2 py-2">
-          <button
-            className={[
-              "flex w-full items-center justify-between rounded-2xl px-2 py-2 text-sm",
-              isReportsExpanded || isReportsRoute ? "text-white" : "text-white/74",
-            ].join(" ")}
-            onClick={() => setIsReportsExpanded((current) => !current)}
-            type="button"
-          >
-            <span className="flex items-center gap-3">
-              <FileText className="h-4 w-4" />
-              Relatórios
-            </span>
-            <ChevronDown
-              className={[
-                "h-4 w-4 transition",
-                isReportsExpanded || isReportsRoute ? "rotate-0" : "-rotate-90",
-              ].join(" ")}
-            />
-          </button>
+              setIsReportsExpanded((current) => !current);
+            },
+          })}
 
-          {isReportsExpanded || isReportsRoute ? (
+          {!isCollapsed && (isReportsExpanded || isReportsRoute) ? (
             <div className="mt-2 space-y-1 px-2 pb-1">
               {reportLinks.map(({ disabled, href, label }) =>
                 disabled ? (
@@ -158,26 +313,15 @@ export function DashboardSidebar({
                     </span>
                   </div>
                 ) : (
-                  <Link
-                    className={[
-                      "flex items-center justify-between rounded-xl px-3 py-2 text-sm transition",
-                      pathname === href
-                        ? "bg-white text-ink shadow-card"
-                        : "text-white/74 hover:bg-white/8 hover:text-white",
-                    ].join(" ")}
-                    href={href}
-                    key={label}
-                  >
-                    <span className="flex items-center gap-2">
-                      {label === "Mensagens" ? (
-                        <MessageSquareText className="h-4 w-4" />
-                      ) : (
-                        <BarChart3 className="h-4 w-4" />
-                      )}
-                      {label}
-                    </span>
-                    <ChevronRight className="h-4 w-4" />
-                  </Link>
+                  <div key={label}>
+                    {renderNavLink({
+                      href,
+                      icon: getLinkIcon(href, label),
+                      isActive: pathname === href,
+                      isCollapsed: false,
+                      label,
+                    })}
+                  </div>
                 )
               )}
             </div>
@@ -185,52 +329,40 @@ export function DashboardSidebar({
         </div>
 
         {canAccessBuyersModule ? (
-          <div className="rounded-2xl border border-white/8 bg-white/4 px-2 py-2">
-            <button
-              className={[
-                "flex w-full items-center justify-between rounded-2xl px-2 py-2 text-sm",
-                isBuyersExpanded || isBuyersModuleRoute ? "text-white" : "text-white/74",
-              ].join(" ")}
-              onClick={() => setIsBuyersExpanded((current) => !current)}
-              type="button"
-            >
-              <span className="flex items-center gap-3">
-                <ShoppingCart className="h-4 w-4" />
-                Sistema de Compradores
-              </span>
-              <ChevronDown
-                className={[
-                  "h-4 w-4 transition",
-                  isBuyersExpanded || isBuyersModuleRoute ? "rotate-0" : "-rotate-90",
-                ].join(" ")}
-              />
-            </button>
+          <div
+            className={[
+              "rounded-2xl border border-white/8 bg-white/4",
+              isCollapsed ? "w-full px-0 py-0" : "px-2 py-2",
+            ].join(" ")}
+          >
+            {renderGroupButton({
+              icon: <ShoppingCart className="h-4 w-4 shrink-0" />,
+              isCollapsed,
+              isExpanded: isBuyersExpanded,
+              isRouteActive: isBuyersModuleRoute,
+              label: "Sistema de Compradores",
+              onClick: () => {
+                if (isCollapsed) {
+                  onToggleCollapse();
+                  return;
+                }
 
-            {isBuyersExpanded || isBuyersModuleRoute ? (
+                setIsBuyersExpanded((current) => !current);
+              },
+            })}
+
+            {!isCollapsed && (isBuyersExpanded || isBuyersModuleRoute) ? (
               <div className="mt-2 space-y-1 px-2 pb-1">
                 {buyersLinks.map(({ href, label }) => (
-                  <Link
-                    className={[
-                      "flex items-center justify-between rounded-xl px-3 py-2 text-sm transition",
-                      pathname === href
-                        ? "bg-white text-ink shadow-card"
-                        : "text-white/74 hover:bg-white/8 hover:text-white",
-                    ].join(" ")}
-                    href={href}
-                    key={label}
-                  >
-                    <span className="flex items-center gap-2">
-                      {href.endsWith("/webhooks") ? (
-                        <Webhook className="h-4 w-4" />
-                      ) : href.endsWith("/contatos") ? (
-                        <ContactRound className="h-4 w-4" />
-                      ) : (
-                        <ShoppingCart className="h-4 w-4" />
-                      )}
-                      {label}
-                    </span>
-                    <ChevronRight className="h-4 w-4" />
-                  </Link>
+                  <div key={label}>
+                    {renderNavLink({
+                      href,
+                      icon: getLinkIcon(href, label),
+                      isActive: pathname === href,
+                      isCollapsed: false,
+                      label,
+                    })}
+                  </div>
                 ))}
               </div>
             ) : null}
@@ -238,30 +370,47 @@ export function DashboardSidebar({
         ) : null}
 
         {isAdmin ? (
-          <Link
-            className={[
-              "flex items-center justify-between rounded-2xl px-4 py-3 text-sm transition",
-              isSettingsActive
-                ? "bg-white text-ink shadow-card"
-                : "text-white/74 hover:bg-white/8 hover:text-white",
-            ].join(" ")}
-            href="/dashboard/configuracoes"
-          >
-            <span className="flex items-center gap-3">
-              <Settings className="h-4 w-4" />
-              Configurações
-            </span>
-            <ChevronRight className="h-4 w-4" />
-          </Link>
+          <div className={isCollapsed ? "w-full" : undefined}>
+            {renderNavLink({
+              href: "/dashboard/configuracoes",
+              icon: <Settings className="h-4 w-4 shrink-0" />,
+              isActive: isSettingsActive,
+              isCollapsed,
+              label: "Configurações",
+            })}
+          </div>
         ) : null}
       </nav>
 
-      <div className="mt-auto rounded-3xl border border-white/10 bg-white/6 p-5">
-        <p className="text-sm text-white/68">Sessão ativa como</p>
-        <p className="mt-2 break-all text-sm font-medium text-white">{userEmail}</p>
-        <div className="mt-5">
-          <SignOutButton />
-        </div>
+      <div
+        className={[
+          "mt-auto rounded-3xl border border-white/10 bg-white/6 transition-all duration-300",
+          isCollapsed ? "p-3" : "p-5",
+        ].join(" ")}
+      >
+        {isCollapsed ? (
+          <div className="flex flex-col items-center gap-3">
+            <div
+              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/8 text-sm font-medium text-white"
+              title={userEmail}
+            >
+              {userEmail.slice(0, 1).toUpperCase()}
+            </div>
+            <SignOutButton
+              className="border-white/10 bg-white/8 text-white hover:border-white/20 hover:text-white"
+              compact
+              title="Sair"
+            />
+          </div>
+        ) : (
+          <>
+            <p className="text-sm text-white/68">Sessão ativa como</p>
+            <p className="mt-2 break-all text-sm font-medium text-white">{userEmail}</p>
+            <div className="mt-5">
+              <SignOutButton />
+            </div>
+          </>
+        )}
       </div>
     </aside>
   );

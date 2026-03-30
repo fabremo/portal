@@ -13,8 +13,14 @@
   processed boolean not null default false,
   processing_attempts integer not null default 0,
   processing_error text,
+  first_failure_stage text,
+  first_processing_error text,
+  initial_processing_duration_ms integer,
+  initial_response_status_code integer,
   last_processing_attempt_at timestamptz,
   last_processing_success_at timestamptz,
+  last_reprocessing_result text,
+  last_reprocessing_error text,
 
   created_at timestamptz not null default now()
 );
@@ -217,5 +223,12 @@ alter table public.company_contacts enable row level security;
 
 alter table public.webhook_logs
 add column if not exists processing_attempts integer not null default 0,
+add column if not exists first_failure_stage text,
+add column if not exists first_processing_error text,
+add column if not exists initial_processing_duration_ms integer,
+add column if not exists initial_response_status_code integer,
 add column if not exists last_processing_attempt_at timestamptz,
-add column if not exists last_processing_success_at timestamptz;
+add column if not exists last_processing_success_at timestamptz,
+add column if not exists last_reprocessing_result text,
+add column if not exists last_reprocessing_error text;
+
