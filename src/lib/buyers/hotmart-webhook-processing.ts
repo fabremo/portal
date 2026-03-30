@@ -717,17 +717,19 @@ export async function processWebhookLog(payload: HotmartWebhookPayload, webhookI
 
   if (payload.event === REFUNDED_EVENT) {
     await wrapStage("process_refunded", () =>
-      updatePurchaseLifecycleEvent(payload, webhookId, payload.event, nextCompanyId)
+      updatePurchaseLifecycleEvent(payload, webhookId, REFUNDED_EVENT, nextCompanyId)
     );
     return { handled: true as const };
   }
 
   if (payload.event === CHARGEBACK_EVENT) {
     await wrapStage("process_chargeback", () =>
-      updatePurchaseLifecycleEvent(payload, webhookId, payload.event, nextCompanyId)
+      updatePurchaseLifecycleEvent(payload, webhookId, CHARGEBACK_EVENT, nextCompanyId)
     );
     return { handled: true as const };
   }
 
   return { handled: false as const };
 }
+
+
