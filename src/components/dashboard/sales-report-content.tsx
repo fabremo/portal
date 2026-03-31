@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { BarChart3, LoaderCircle } from "lucide-react";
@@ -15,6 +15,8 @@ import {
 type SalesReportContentProps = {
   activeAdAccountName: string;
   adAccountId: string;
+  initialPreset?: SalesDatePreset;
+  initialReport: ClientSalesReportResult;
 };
 
 const SALES_PERIOD_OPTIONS: Array<{ label: string; preset: SalesDatePreset }> = [
@@ -104,32 +106,44 @@ function renderPresetButtons(
   });
 }
 
-export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesReportContentProps) {
+export function SalesReportContent({
+  activeAdAccountName,
+  adAccountId,
+  initialPreset = "last_7_days",
+  initialReport,
+}: SalesReportContentProps) {
   const { getSalesReport } = useMetaReports();
-  const [selectedPreset, setSelectedPreset] = useState<SalesDatePreset>("last_7_days");
-  const [report, setReport] = useState<ClientSalesReportResult | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<SalesDatePreset>(initialPreset);
+  const [asyncReport, setAsyncReport] = useState<ClientSalesReportResult | null>(null);
 
   function handlePresetSelect(preset: SalesDatePreset) {
     if (preset === selectedPreset) {
       return;
     }
 
-    setReport(null);
     setSelectedPreset(preset);
+
+    if (preset !== initialPreset) {
+      setAsyncReport(null);
+    }
   }
 
   useEffect(() => {
+    if (selectedPreset === initialPreset) {
+      return;
+    }
+
     let isMounted = true;
 
     getSalesReport(adAccountId, selectedPreset)
       .then((nextReport) => {
         if (isMounted) {
-          setReport(nextReport);
+          setAsyncReport(nextReport);
         }
       })
       .catch((error: unknown) => {
         if (isMounted) {
-          setReport(
+          setAsyncReport(
             createSalesErrorResult(
               error instanceof Error ? error.message : "Não foi possível carregar o relatório de vendas.",
               selectedPreset
@@ -141,7 +155,9 @@ export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesRe
     return () => {
       isMounted = false;
     };
-  }, [adAccountId, getSalesReport, selectedPreset]);
+  }, [adAccountId, getSalesReport, initialPreset, selectedPreset]);
+
+  const report = selectedPreset === initialPreset ? initialReport : asyncReport;
 
   if (!report) {
     return (

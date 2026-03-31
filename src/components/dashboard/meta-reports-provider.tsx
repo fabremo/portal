@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   createContext,
@@ -165,33 +165,6 @@ function normalizeReport<T>(kind: ReportKind, report: T) {
   return report;
 }
 
-function readSessionValue<T>(key: string) {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const rawValue = window.sessionStorage.getItem(key);
-
-  if (!rawValue) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(rawValue) as T;
-  } catch {
-    window.sessionStorage.removeItem(key);
-    return null;
-  }
-}
-
-function writeSessionValue(key: string, value: unknown) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.sessionStorage.setItem(key, JSON.stringify(value));
-}
-
 function createApiError(status: number, payload: ApiErrorResponse | null) {
   const fallbackMessage =
     status === 401
@@ -238,15 +211,6 @@ export function MetaReportsProvider({ children, userId }: MetaReportsProviderPro
         return normalizeReport(kind, memoryValue as T);
       }
 
-      const sessionValue = readSessionValue<T>(cacheKey);
-
-      if (sessionValue) {
-        const normalizedSessionValue = normalizeReport(kind, sessionValue);
-        memoryCacheRef.current.set(cacheKey, normalizedSessionValue);
-        writeSessionValue(cacheKey, normalizedSessionValue);
-        return normalizedSessionValue;
-      }
-
       const inflightRequest = inflightRequestsRef.current.get(cacheKey);
 
       if (inflightRequest) {
@@ -269,7 +233,6 @@ export function MetaReportsProvider({ children, userId }: MetaReportsProviderPro
           const normalizedPayload = normalizeReport(kind, payload as T);
 
           memoryCacheRef.current.set(cacheKey, normalizedPayload);
-          writeSessionValue(cacheKey, normalizedPayload);
           return normalizedPayload;
         })
         .finally(() => {

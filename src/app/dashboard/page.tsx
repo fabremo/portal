@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { DashboardOverviewContent } from "@/components/dashboard/dashboard-overview-content";
 import { getDashboardAccessContext } from "@/lib/dashboard/access";
+import { getFacebookSalesReport } from "@/lib/facebook/sales-report";
 import { getFacebookAccountStatus } from "@/lib/facebook/status";
 
 export const metadata: Metadata = {
@@ -15,13 +16,16 @@ export default async function DashboardPage() {
     return null;
   }
 
-  const facebookStatus = await getFacebookAccountStatus(accessContext.activeAdAccount.id);
+  const [facebookStatus, salesReport] = await Promise.all([
+    getFacebookAccountStatus(accessContext.activeAdAccount.id),
+    getFacebookSalesReport(accessContext.activeAdAccount.id),
+  ]);
 
   return (
     <DashboardOverviewContent
       activeAdAccountName={accessContext.activeAdAccount.name}
-      adAccountId={accessContext.activeAdAccount.id}
       facebookStatus={facebookStatus}
+      salesReport={salesReport}
     />
   );
 }

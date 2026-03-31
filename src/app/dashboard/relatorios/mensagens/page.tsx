@@ -1,7 +1,8 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 
 import { MessagesReportContent } from "@/components/dashboard/messages-report-content";
 import { getDashboardAccessContext } from "@/lib/dashboard/access";
+import { getFacebookMessagesReport } from "@/lib/facebook/messages-report";
 
 export const metadata: Metadata = {
   title: "Relatório de Mensagens",
@@ -14,10 +15,12 @@ export default async function MessagesReportPage() {
     return null;
   }
 
+  const initialReport = await getFacebookMessagesReport(accessContext.activeAdAccount.id);
+
   return (
     <MessagesReportContent
       activeAdAccountName={accessContext.activeAdAccount.name}
-      adAccountId={accessContext.activeAdAccount.id}
+      initialReport={initialReport}
     />
   );
 }

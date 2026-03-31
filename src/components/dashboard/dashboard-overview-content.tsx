@@ -1,13 +1,6 @@
-﻿"use client";
-
-import { useEffect, useState } from "react";
 import { BellDot, DollarSign, ShoppingBag } from "lucide-react";
 
-import {
-  type ClientSalesReportResult,
-  useMetaReports,
-} from "@/components/dashboard/meta-reports-provider";
-import { getSalesDateRange } from "@/lib/facebook/sales-date-range";
+import { type ClientSalesReportResult } from "@/components/dashboard/meta-reports-provider";
 
 type FacebookStatusTone = "success" | "warning" | "danger" | "neutral";
 
@@ -22,8 +15,8 @@ type FacebookAccountStatusView = {
 
 type DashboardOverviewContentProps = {
   activeAdAccountName: string;
-  adAccountId: string;
   facebookStatus: FacebookAccountStatusView;
+  salesReport: ClientSalesReportResult;
 };
 
 const toneStyles = {
@@ -48,70 +41,26 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat("pt-BR").format(value);
 }
 
-function createSalesErrorResult(message: string): ClientSalesReportResult {
-  const { since, until } = getSalesDateRange();
-
-  return {
-    adRows: [],
-    dailyRows: [],
-    lastCheckedAt: new Date().toISOString(),
-    message,
-    rows: [],
-    since,
-    state: "error",
-    until,
-  };
-}
-
 export function DashboardOverviewContent({
   activeAdAccountName,
-  adAccountId,
   facebookStatus,
+  salesReport,
 }: DashboardOverviewContentProps) {
-  const { getSalesReport } = useMetaReports();
-  const [salesReport, setSalesReport] = useState<ClientSalesReportResult | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    getSalesReport(adAccountId)
-      .then((report) => {
-        if (isMounted) {
-          setSalesReport(report);
-        }
-      })
-      .catch((error: unknown) => {
-        if (isMounted) {
-          setSalesReport(
-            createSalesErrorResult(
-              error instanceof Error ? error.message : "Não foi possível carregar os dados de vendas."
-            )
-          );
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [adAccountId, getSalesReport]);
-
   const lastCheckedAt = new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(facebookStatus.lastCheckedAt));
   const shouldShowRawStatusCode =
     facebookStatus.statusTone === "warning" || facebookStatus.statusTone === "danger";
-  const dateRangeLabel = salesReport
-    ? `${formatDate(salesReport.since)} a ${formatDate(salesReport.until)}`
-    : "Carregando intervalo...";
+  const dateRangeLabel = `${formatDate(salesReport.since)} a ${formatDate(salesReport.until)}`;
   const shouldShowSalesError =
-    salesReport?.state === "not_configured" || salesReport?.state === "error";
+    salesReport.state === "not_configured" || salesReport.state === "error";
   const totalPurchases =
-    salesReport && (salesReport.state === "ok" || salesReport.state === "empty")
+    salesReport.state === "ok" || salesReport.state === "empty"
       ? salesReport.rows.reduce((total, row) => total + row.purchases, 0)
       : null;
   const totalAmountSpent =
-    salesReport && (salesReport.state === "ok" || salesReport.state === "empty")
+    salesReport.state === "ok" || salesReport.state === "empty"
       ? salesReport.rows.reduce((total, row) => total + row.amountSpent, 0)
       : null;
 
@@ -167,10 +116,8 @@ export function DashboardOverviewContent({
               </p>
               {totalPurchases !== null ? (
                 <p className="mt-4 text-4xl font-semibold text-ink">{formatNumber(totalPurchases)}</p>
-              ) : salesReport ? (
-                <p className="mt-4 text-2xl font-semibold text-ink">Indisponível</p>
               ) : (
-                <p className="mt-4 text-2xl font-semibold text-ink/45">Carregando...</p>
+                <p className="mt-4 text-2xl font-semibold text-ink">Indisponível</p>
               )}
             </div>
             <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
@@ -193,10 +140,8 @@ export function DashboardOverviewContent({
               </p>
               {totalAmountSpent !== null ? (
                 <p className="mt-4 text-4xl font-semibold text-ink">{formatCurrency(totalAmountSpent)}</p>
-              ) : salesReport ? (
-                <p className="mt-4 text-2xl font-semibold text-ink">Indisponível</p>
               ) : (
-                <p className="mt-4 text-2xl font-semibold text-ink/45">Carregando...</p>
+                <p className="mt-4 text-2xl font-semibold text-ink">Indisponível</p>
               )}
             </div>
             <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
