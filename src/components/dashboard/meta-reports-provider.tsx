@@ -8,7 +8,7 @@ import {
   type PropsWithChildren,
 } from "react";
 
-import { getSalesDateRange, type SalesDatePreset } from "@/lib/facebook/sales-date-range";
+import { getReportDateRange, type ReportDatePreset } from "@/lib/facebook/report-date-range";
 
 const META_REPORT_CACHE_PREFIX = "meta-report";
 
@@ -120,7 +120,7 @@ type MetaReportsContextValue = {
   getMessagesReport: (adAccountId: string) => Promise<ClientMessagesReportResult>;
   getSalesReport: (
     adAccountId: string,
-    preset?: SalesDatePreset
+    preset?: ReportDatePreset
   ) => Promise<ClientSalesReportResult>;
 };
 
@@ -140,9 +140,9 @@ function buildCacheKey(
   userId: string,
   adAccountId: string,
   kind: ReportKind,
-  preset: SalesDatePreset = "last_7_days"
+  preset: ReportDatePreset = "last_7_days"
 ) {
-  const { since, until } = getSalesDateRange(preset);
+  const { since, until } = getReportDateRange(preset);
   return `${META_REPORT_CACHE_PREFIX}:${userId}:${adAccountId}:${kind}:${preset}:${since}:${until}`;
 }
 
@@ -202,7 +202,7 @@ export function MetaReportsProvider({ children, userId }: MetaReportsProviderPro
     async function loadReport<T>(
       kind: ReportKind,
       adAccountId: string,
-      preset: SalesDatePreset = "last_7_days"
+      preset: ReportDatePreset = "last_7_days"
     ) {
       const cacheKey = buildCacheKey(userId, adAccountId, kind, preset);
       const memoryValue = memoryCacheRef.current.get(cacheKey);

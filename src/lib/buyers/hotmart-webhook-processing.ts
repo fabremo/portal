@@ -175,7 +175,7 @@ type PurchaseLifecycleRow = {
   transaction: string;
 };
 
-type WebhookProcessingState = {
+export type WebhookProcessingState = {
   processed: boolean;
   processing_error: string | null;
 };

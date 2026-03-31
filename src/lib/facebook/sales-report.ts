@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getSalesDateRange, type SalesDatePreset } from "@/lib/facebook/sales-date-range";
+import { getReportDateRange, type ReportDatePreset } from "@/lib/facebook/report-date-range";
 const META_GRAPH_VERSION = "v25.0";
 const SALES_CAMPAIGN_TAG = "[VENDAS]";
 
@@ -435,11 +435,11 @@ async function fetchAdSalesInsights(
 
 export async function getFacebookSalesReport(
   adAccountId: string,
-  preset: SalesDatePreset = "last_7_days"
+  preset: ReportDatePreset = "last_7_days"
 ): Promise<FacebookSalesReportResult> {
   const accessToken = process.env.FACEBOOK_ACCESS_TOKEN;
   const lastCheckedAt = new Date().toISOString();
-  const { since, until } = getSalesDateRange(preset);
+  const { since, until } = getReportDateRange(preset);
   if (!accessToken) {
     return {
       adRows: [],

@@ -1,4 +1,6 @@
-﻿import "server-only";
+import "server-only";
+
+import { getReportDateRange } from "@/lib/facebook/report-date-range";
 
 const META_GRAPH_VERSION = "v25.0";
 const MESSAGES_CAMPAIGN_TAG = "[WHATS]";
@@ -100,29 +102,7 @@ export type FacebookMessagesReportResult =
       until: string;
     };
 
-function getDateRange() {
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
 
-  const until = new Date(today);
-  until.setDate(today.getDate() - 1);
-
-  const since = new Date(until);
-  since.setDate(until.getDate() - 6);
-
-  const format = (value: Date) => {
-    const year = value.getFullYear();
-    const month = String(value.getMonth() + 1).padStart(2, "0");
-    const day = String(value.getDate()).padStart(2, "0");
-
-    return year + "-" + month + "-" + day;
-  };
-
-  return {
-    since: format(since),
-    until: format(until),
-  };
-}
 
 function parseNumber(value?: string | number | null) {
   const parsed = Number(value ?? 0);
@@ -395,7 +375,7 @@ export async function getFacebookMessagesReport(
 ): Promise<FacebookMessagesReportResult> {
   const accessToken = process.env.FACEBOOK_ACCESS_TOKEN;
   const lastCheckedAt = new Date().toISOString();
-  const { since, until } = getDateRange();
+  const { since, until } = getReportDateRange("last_7_days");
   const campaignLabel = "Campanhas [WHATS] da conta";
 
   if (!accessToken) {
