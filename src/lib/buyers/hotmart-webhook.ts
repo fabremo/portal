@@ -1,4 +1,4 @@
-﻿import "server-only";
+import "server-only";
 
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/service-role";
 
@@ -314,7 +314,12 @@ export function resolveWebhookSecret(
   payload: Pick<HotmartWebhookPayload, "hottok">,
   headers: Pick<Headers, "get">
 ) {
-  return headers.get("hottok") ?? headers.get("x-webhook-secret") ?? normalizeString(payload.hottok);
+  return (
+    headers.get("x-hotmart-hottok") ??
+    headers.get("hottok") ??
+    headers.get("x-webhook-secret") ??
+    normalizeString(payload.hottok)
+  );
 }
 
 export function buildWebhookLogInsert(payload: HotmartWebhookPayload, companyId: string | null): WebhookLogInsert | null {

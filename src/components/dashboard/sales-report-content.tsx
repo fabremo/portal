@@ -156,7 +156,7 @@ export function SalesReportContent({ activeAdAccountName, adAccountId }: SalesRe
               <div>
                 <h2 className="text-3xl font-semibold">Campanhas de vendas</h2>
                 <p className="mt-2 max-w-3xl text-ink/72">
-                  Estamos consultando a Meta e reaproveitando os dados da sessão quando possível.
+                  Estamos consultando a Meta.
                 </p>
               </div>
             </div>
