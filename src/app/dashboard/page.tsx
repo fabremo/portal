@@ -2,6 +2,7 @@
 
 import { DashboardOverviewContent } from "@/components/dashboard/dashboard-overview-content";
 import { getDashboardAccessContext } from "@/lib/dashboard/access";
+import { getFacebookMessagesReport } from "@/lib/facebook/messages-report";
 import { getFacebookSalesReport } from "@/lib/facebook/sales-report";
 import { getFacebookAccountStatus } from "@/lib/facebook/status";
 
@@ -16,9 +17,14 @@ export default async function DashboardPage() {
     return null;
   }
 
-  const [facebookStatus, salesReport] = await Promise.all([
+  const [facebookStatus, salesReport, messagesReport] = await Promise.all([
     getFacebookAccountStatus(accessContext.activeAdAccount.id),
     getFacebookSalesReport(
+      accessContext.activeCompanyId,
+      accessContext.activeAdAccount.id,
+      accessContext.userId
+    ),
+    getFacebookMessagesReport(
       accessContext.activeCompanyId,
       accessContext.activeAdAccount.id,
       accessContext.userId
@@ -29,6 +35,7 @@ export default async function DashboardPage() {
     <DashboardOverviewContent
       activeAdAccountName={accessContext.activeAdAccount.name}
       facebookStatus={facebookStatus}
+      messagesReport={messagesReport}
       salesReport={salesReport}
     />
   );

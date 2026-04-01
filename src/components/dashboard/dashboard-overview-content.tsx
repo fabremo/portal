@@ -1,6 +1,9 @@
-import { BellDot, DollarSign, ShoppingBag } from "lucide-react";
+﻿import { BadgeDollarSign, BellDot, DollarSign, MessageSquareText, ShoppingBag } from "lucide-react";
 
-import { type ClientSalesReportResult } from "@/components/dashboard/meta-reports-provider";
+import {
+  type ClientMessagesReportResult,
+  type ClientSalesReportResult,
+} from "@/components/dashboard/meta-reports-provider";
 
 type FacebookStatusTone = "success" | "warning" | "danger" | "neutral";
 
@@ -16,6 +19,7 @@ type FacebookAccountStatusView = {
 type DashboardOverviewContentProps = {
   activeAdAccountName: string;
   facebookStatus: FacebookAccountStatusView;
+  messagesReport: ClientMessagesReportResult;
   salesReport: ClientSalesReportResult;
 };
 
@@ -44,6 +48,7 @@ function formatNumber(value: number) {
 export function DashboardOverviewContent({
   activeAdAccountName,
   facebookStatus,
+  messagesReport,
   salesReport,
 }: DashboardOverviewContentProps) {
   const lastCheckedAt = new Intl.DateTimeFormat("pt-BR", {
@@ -55,6 +60,8 @@ export function DashboardOverviewContent({
   const dateRangeLabel = `${formatDate(salesReport.since)} a ${formatDate(salesReport.until)}`;
   const shouldShowSalesError =
     salesReport.state === "not_configured" || salesReport.state === "error";
+  const shouldShowMessagesError =
+    messagesReport.state === "not_configured" || messagesReport.state === "error";
   const totalPurchases =
     salesReport.state === "ok" || salesReport.state === "empty"
       ? salesReport.rows.reduce((total, row) => total + row.purchases, 0)
@@ -62,6 +69,12 @@ export function DashboardOverviewContent({
   const totalAmountSpent =
     salesReport.state === "ok" || salesReport.state === "empty"
       ? salesReport.rows.reduce((total, row) => total + row.amountSpent, 0)
+      : null;
+  const totalStartedMessages =
+    messagesReport.state === "ok" ||
+      messagesReport.state === "empty" ||
+      messagesReport.state === "not_found"
+      ? messagesReport.rows.reduce((total, row) => total + row.startedMessages, 0)
       : null;
 
   return (
@@ -107,7 +120,32 @@ export function DashboardOverviewContent({
         </div>
       </header>
 
-      <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+      <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+
+
+        <article className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-card md:p-7">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ink/55">
+                Total investido
+              </p>
+              {totalAmountSpent !== null ? (
+                <p className="mt-4 text-4xl font-semibold text-ink">{formatCurrency(totalAmountSpent)}</p>
+              ) : (
+                <p className="mt-4 text-2xl font-semibold text-ink">Indisponível</p>
+              )}
+            </div>
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+              <DollarSign className="h-5 w-5" />
+            </span>
+          </div>
+
+          {shouldShowSalesError ? (
+            <div className="mt-5 text-sm text-ink/70">
+              <p>{salesReport.message}</p>
+            </div>
+          ) : null}
+        </article>
         <article className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-card md:p-7">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -136,16 +174,41 @@ export function DashboardOverviewContent({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ink/55">
-                Total investido
+                Mensagens iniciadas
               </p>
-              {totalAmountSpent !== null ? (
-                <p className="mt-4 text-4xl font-semibold text-ink">{formatCurrency(totalAmountSpent)}</p>
+              {totalStartedMessages !== null ? (
+                <p className="mt-4 text-4xl font-semibold text-ink">{formatNumber(totalStartedMessages)}</p>
               ) : (
                 <p className="mt-4 text-2xl font-semibold text-ink">Indisponível</p>
               )}
             </div>
             <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
-              <DollarSign className="h-5 w-5" />
+              <MessageSquareText className="h-5 w-5" />
+            </span>
+          </div>
+
+          {shouldShowMessagesError ? (
+            <div className="mt-5 text-sm text-ink/70">
+              <p>{messagesReport.message}</p>
+            </div>
+          ) : null}
+        </article>
+        <article className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-card md:p-7">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ink/55">
+                Custo por compra
+              </p>
+              {totalPurchases !== null && totalAmountSpent !== null && totalPurchases > 0 ? (
+                <p className="mt-4 text-4xl font-semibold text-ink">
+                  {formatCurrency(totalAmountSpent / totalPurchases)}
+                </p>
+              ) : (
+                <p className="mt-4 text-2xl font-semibold text-ink">Indisponível</p>
+              )}
+            </div>
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+              <BadgeDollarSign className="h-5 w-5" />
             </span>
           </div>
 
@@ -155,6 +218,8 @@ export function DashboardOverviewContent({
             </div>
           ) : null}
         </article>
+
+
       </section>
     </section>
   );
