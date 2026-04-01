@@ -1,53 +1,16 @@
-import "server-only";
+﻿import "server-only";
 
+import {
+  ensureMetaInsightsReady,
+  hasStoredCampaignTag,
+  listStoredMetaInsights,
+  MetaSyncNotConfiguredError,
+} from "@/lib/facebook/meta-insights";
 import { getReportDateRange, type ReportDatePreset } from "@/lib/facebook/report-date-range";
-const META_GRAPH_VERSION = "v25.0";
+
 const SALES_CAMPAIGN_TAG = "[VENDAS]";
 
-const PURCHASE_ACTION_TYPES = ["purchase"] as const;
-
-type MetaAction = {
-  action_type?: string;
-  value?: string;
-};
-
-type MetaCampaign = {
-  id: string;
-  name: string;
-};
-
-type MetaCampaignResponse = {
-  data?: MetaCampaign[];
-  error?: {
-    message?: string;
-  };
-  paging?: {
-    next?: string;
-  };
-};
-
-type MetaInsightRow = {
-  ad_id?: string;
-  ad_name?: string;
-  action_values?: MetaAction[];
-  actions?: MetaAction[];
-  campaign_id?: string;
-  campaign_name?: string;
-  date_start?: string;
-  impressions?: string;
-  inline_link_clicks?: string;
-  spend?: string;
-};
-
-type MetaInsightResponse = {
-  data?: MetaInsightRow[];
-  error?: {
-    message?: string;
-  };
-  paging?: {
-    next?: string;
-  };
-};
+type StoredInsightRow = Awaited<ReturnType<typeof listStoredMetaInsights>>[number];
 
 export type FacebookSalesRow = {
   amountSpent: number;
@@ -79,118 +42,109 @@ export type FacebookSalesAdRow = {
 
 export type FacebookSalesReportResult =
   | {
-    adRows: [];
-    dailyRows: [];
-    lastCheckedAt: string;
-    message: string;
-    rows: [];
-    since: string;
-    state: "not_configured" | "not_found" | "error";
-    until: string;
-  }
+      adRows: [];
+      dailyRows: [];
+      lastCheckedAt: string;
+      message: string;
+      rows: [];
+      since: string;
+      state: "not_configured" | "not_found" | "error";
+      until: string;
+    }
   | {
-    adRows: FacebookSalesAdRow[];
-    dailyRows: FacebookSalesDailyRow[];
-    lastCheckedAt: string;
-    rows: FacebookSalesRow[];
-    since: string;
-    state: "empty" | "ok";
-    until: string;
-  };
+      adRows: FacebookSalesAdRow[];
+      dailyRows: FacebookSalesDailyRow[];
+      lastCheckedAt: string;
+      rows: FacebookSalesRow[];
+      since: string;
+      state: "empty" | "ok";
+      until: string;
+    };
 
 export type FacebookSalesOverviewSummary =
   | {
-    lastCheckedAt: string;
-    message: string;
-    since: string;
-    state: "not_configured" | "not_found" | "error";
-    totalAmountSpent: null;
-    totalPurchases: null;
-    until: string;
-  }
+      lastCheckedAt: string;
+      message: string;
+      since: string;
+      state: "not_configured" | "not_found" | "error";
+      totalAmountSpent: null;
+      totalPurchases: null;
+      until: string;
+    }
   | {
-    lastCheckedAt: string;
-    since: string;
-    state: "empty" | "ok";
-    totalAmountSpent: number;
-    totalPurchases: number;
-    until: string;
-  };
-
-
-function parseNumber(value?: string | number | null) {
-  const parsed = Number(value ?? 0);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function isPurchaseActionType(actionType?: string) {
-  return Boolean(
-    actionType &&
-    PURCHASE_ACTION_TYPES.includes(actionType as (typeof PURCHASE_ACTION_TYPES)[number])
-  );
-}
-
-function extractPurchaseCount(actions?: MetaAction[]) {
-  if (!actions?.length) {
-    return 0;
-  }
-
-  return actions.reduce((total, action) => {
-    if (!isPurchaseActionType(action.action_type)) {
-      return total;
-    }
-
-    return total + parseNumber(action.value);
-  }, 0);
-}
-
-function extractPurchaseValue(actionValues?: MetaAction[]) {
-  if (!actionValues?.length) {
-    return 0;
-  }
-
-  return actionValues.reduce((total, action) => {
-    if (!isPurchaseActionType(action.action_type)) {
-      return total;
-    }
-
-    return total + parseNumber(action.value);
-  }, 0);
-}
+      lastCheckedAt: string;
+      since: string;
+      state: "empty" | "ok";
+      totalAmountSpent: number;
+      totalPurchases: number;
+      until: string;
+    };
 
 function calculateRoas(amountSpent: number, purchaseValue: number) {
   return amountSpent > 0 ? purchaseValue / amountSpent : null;
 }
 
-function buildDailyRows(rows: MetaInsightRow[]) {
-  const groupedRows = new Map<string, FacebookSalesDailyRow>();
+function getLatestSyncedAt(rows: StoredInsightRow[]) {
+  return rows.reduce((latest, row) => {
+    return row.synced_at > latest ? row.synced_at : latest;
+  }, rows[0]?.synced_at ?? new Date().toISOString());
+}
+
+function filterSalesRows(rows: StoredInsightRow[]) {
+  return rows.filter((row) => row.campaign_name?.includes(SALES_CAMPAIGN_TAG));
+}
+
+function buildCampaignRows(rows: StoredInsightRow[]) {
+  const groupedRows = new Map<string, FacebookSalesRow>();
 
   for (const row of rows) {
-    const date = row.date_start;
-
-    if (!date) {
-      continue;
-    }
-
-    const amountSpent = parseNumber(row.spend);
-    const purchases = extractPurchaseCount(row.actions);
-    const purchaseValue = extractPurchaseValue(row.action_values);
-    const existingRow = groupedRows.get(date);
+    const campaignId = row.campaign_id || row.campaign_name || "campanha-sem-id";
+    const campaignName = row.campaign_name || "Campanha sem nome";
+    const existingRow = groupedRows.get(campaignId);
 
     if (!existingRow) {
-      groupedRows.set(date, {
-        amountSpent,
-        date,
-        purchaseValue,
-        purchases,
-        roas: calculateRoas(amountSpent, purchaseValue),
+      groupedRows.set(campaignId, {
+        amountSpent: row.spend,
+        campaignId,
+        campaignName,
+        purchaseValue: row.purchase_value,
+        purchases: row.purchases,
+        roas: calculateRoas(row.spend, row.purchase_value),
       });
       continue;
     }
 
-    existingRow.amountSpent += amountSpent;
-    existingRow.purchaseValue += purchaseValue;
-    existingRow.purchases += purchases;
+    existingRow.amountSpent += row.spend;
+    existingRow.purchaseValue += row.purchase_value;
+    existingRow.purchases += row.purchases;
+    existingRow.roas = calculateRoas(existingRow.amountSpent, existingRow.purchaseValue);
+  }
+
+  return Array.from(groupedRows.values()).sort((left, right) =>
+    left.campaignName.localeCompare(right.campaignName, "pt-BR")
+  );
+}
+
+function buildDailyRows(rows: StoredInsightRow[]) {
+  const groupedRows = new Map<string, FacebookSalesDailyRow>();
+
+  for (const row of rows) {
+    const existingRow = groupedRows.get(row.insight_date);
+
+    if (!existingRow) {
+      groupedRows.set(row.insight_date, {
+        amountSpent: row.spend,
+        date: row.insight_date,
+        purchaseValue: row.purchase_value,
+        purchases: row.purchases,
+        roas: calculateRoas(row.spend, row.purchase_value),
+      });
+      continue;
+    }
+
+    existingRow.amountSpent += row.spend;
+    existingRow.purchaseValue += row.purchase_value;
+    existingRow.purchases += row.purchases;
     existingRow.roas = calculateRoas(existingRow.amountSpent, existingRow.purchaseValue);
   }
 
@@ -199,17 +153,7 @@ function buildDailyRows(rows: MetaInsightRow[]) {
   );
 }
 
-/**
- * Consolida as linhas brutas de insights por anúncio retornadas pela Meta.
- *
- * Agrupa os registros pelo nome do anúncio, soma os principais indicadores
- * (gasto, impressões, cliques, compras e faturamento) e calcula métricas
- * derivadas como CTR, CPC, custo por compra e ROAS.
- *
- * O resultado final dessa função alimenta a tabela "por anúncio" do relatório.
- */
-
-function buildAdRows(rows: MetaInsightRow[]) {
+function buildAdRows(rows: StoredInsightRow[]) {
   const groupedRows = new Map<
     string,
     {
@@ -229,35 +173,25 @@ function buildAdRows(rows: MetaInsightRow[]) {
       continue;
     }
 
-    const amountSpent = parseNumber(row.spend);
-    const impressions = parseNumber(row.impressions);
-    const linkClicks = parseNumber(row.inline_link_clicks);
-    const purchases = extractPurchaseCount(row.actions);
     const existingRow = groupedRows.get(adName);
-    const purchaseValue = extractPurchaseValue(row.action_values);
-
-
-
-
 
     if (!existingRow) {
       groupedRows.set(adName, {
         adName,
-        amountSpent,
-        impressions,
-        linkClicks,
-        purchases,
-        purchaseValue,
+        amountSpent: row.spend,
+        impressions: row.impressions,
+        linkClicks: row.inline_link_clicks,
+        purchaseValue: row.purchase_value,
+        purchases: row.purchases,
       });
       continue;
     }
 
-    existingRow.amountSpent += amountSpent;
-    existingRow.impressions += impressions;
-    existingRow.linkClicks += linkClicks;
-    existingRow.purchases += purchases;
-    existingRow.purchaseValue += purchaseValue;
-
+    existingRow.amountSpent += row.spend;
+    existingRow.impressions += row.impressions;
+    existingRow.linkClicks += row.inline_link_clicks;
+    existingRow.purchaseValue += row.purchase_value;
+    existingRow.purchases += row.purchases;
   }
 
   return Array.from(groupedRows.values())
@@ -267,8 +201,8 @@ function buildAdRows(rows: MetaInsightRow[]) {
       costPerLinkClick: row.linkClicks > 0 ? row.amountSpent / row.linkClicks : null,
       costPerPurchase: row.purchases > 0 ? row.amountSpent / row.purchases : null,
       linkCtr: row.impressions > 0 ? (row.linkClicks / row.impressions) * 100 : null,
-      purchases: row.purchases,
       purchaseValue: row.purchaseValue,
+      purchases: row.purchases,
       roas: calculateRoas(row.amountSpent, row.purchaseValue),
     }))
     .sort((left, right) => {
@@ -284,208 +218,69 @@ function buildAdRows(rows: MetaInsightRow[]) {
     });
 }
 
-async function fetchMetaJson<T>(url: string) {
-  const response = await fetch(url, {
-    cache: "no-store",
-  });
-
-  const payload = (await response.json()) as T & { error?: { message?: string } };
-
-  if (!response.ok || payload.error) {
-    throw new Error(payload.error?.message || "Falha ao consultar a API da Meta.");
-  }
-
-  return payload;
-}
-
-async function findSalesCampaigns(accessToken: string, adAccountId: string) {
-  let nextUrl =
-    `https://graph.facebook.com/${META_GRAPH_VERSION}/${adAccountId}/campaigns?` +
-    new URLSearchParams({
-      access_token: accessToken,
-      fields: "id,name",
-      limit: "100",
-    }).toString();
-
-  const campaigns: MetaCampaign[] = [];
-
-  while (nextUrl) {
-    const payload = await fetchMetaJson<MetaCampaignResponse>(nextUrl);
-    const matchingCampaigns =
-      payload.data?.filter((campaign) => campaign.name?.includes(SALES_CAMPAIGN_TAG)) ?? [];
-
-    campaigns.push(...matchingCampaigns);
-    nextUrl = payload.paging?.next ?? "";
-  }
-
-  return campaigns;
-}
-
-async function fetchCampaignSalesInsight(
-  accessToken: string,
-  campaign: MetaCampaign,
-  since: string,
-  until: string
-) {
-  const insightUrl =
-    `https://graph.facebook.com/${META_GRAPH_VERSION}/${campaign.id}/insights?` +
-    new URLSearchParams({
-      access_token: accessToken,
-      fields: "campaign_id,campaign_name,spend,actions,action_values",
-      time_increment: "all_days",
-      time_range: JSON.stringify({ since, until }),
-    }).toString();
-
-  const payload = await fetchMetaJson<MetaInsightResponse>(insightUrl);
-  const row = payload.data?.[0];
-
-  if (!row) {
-    return null;
-  }
-
-  const amountSpent = parseNumber(row.spend);
-  const purchases = extractPurchaseCount(row.actions);
-  const purchaseValue = extractPurchaseValue(row.action_values);
-
-  return {
-    amountSpent,
-    campaignId: row.campaign_id || campaign.id,
-    campaignName: row.campaign_name || campaign.name,
-    purchaseValue,
-    purchases,
-    roas: calculateRoas(amountSpent, purchaseValue),
-  } satisfies FacebookSalesRow;
-}
-
-async function fetchDailySalesInsights(
-  accessToken: string,
-  adAccountId: string,
-  since: string,
-  until: string
-) {
-  let nextUrl =
-    `https://graph.facebook.com/${META_GRAPH_VERSION}/${adAccountId}/insights?` +
-    new URLSearchParams({
-      access_token: accessToken,
-      fields: "campaign_id,campaign_name,date_start,spend,actions,action_values",
-      level: "campaign",
-      time_increment: "1",
-      time_range: JSON.stringify({ since, until }),
-    }).toString();
-
-  const rows: MetaInsightRow[] = [];
-
-  while (nextUrl) {
-    const payload = await fetchMetaJson<MetaInsightResponse>(nextUrl);
-    const matchingRows =
-      payload.data?.filter((row) => row.campaign_name?.includes(SALES_CAMPAIGN_TAG)) ?? [];
-
-    rows.push(...matchingRows);
-    nextUrl = payload.paging?.next ?? "";
-  }
-
-  return buildDailyRows(rows);
-}
-
-async function fetchAdSalesInsights(
-  accessToken: string,
-  adAccountId: string,
-  since: string,
-  until: string
-) {
-  let nextUrl =
-    `https://graph.facebook.com/${META_GRAPH_VERSION}/${adAccountId}/insights?` +
-    new URLSearchParams({
-      access_token: accessToken,
-      fields: "ad_id,ad_name,campaign_id,campaign_name,spend,impressions,inline_link_clicks,actions,action_values",
-      level: "ad",
-      time_increment: "all_days",
-      time_range: JSON.stringify({ since, until }),
-    }).toString();
-
-  const rows: MetaInsightRow[] = [];
-
-  while (nextUrl) {
-    const payload = await fetchMetaJson<MetaInsightResponse>(nextUrl);
-    const matchingRows =
-      payload.data?.filter((row) => row.campaign_name?.includes(SALES_CAMPAIGN_TAG)) ?? [];
-
-    rows.push(...matchingRows);
-    nextUrl = payload.paging?.next ?? "";
-  }
-
-  return buildAdRows(rows);
-}
-
-/**
- * Monta o relatório completo de vendas da conta de anúncios selecionada.
- *
- * Fluxo:
- * 1. Valida se existe token da Meta configurado.
- * 2. Busca as campanhas da conta cujo nome contenha [VENDAS].
- * 3. Consulta, em paralelo, os dados agregados por campanha, por dia e por anúncio.
- * 4. Normaliza os dados retornados pela API da Meta e calcula métricas como compras,
- *    faturamento, custo por compra e ROAS.
- * 5. Retorna um objeto único para a UI, com estados de sucesso, vazio, erro ou
- *    configuração ausente.
- *
- * Essa é a função principal do relatório de vendas e serve como ponto central de
- * orquestração dos fetches e transformações feitas neste arquivo.
- */
-
 export async function getFacebookSalesReport(
+  companyId: string,
   adAccountId: string,
+  userId: string,
   preset: ReportDatePreset = "last_7_days"
 ): Promise<FacebookSalesReportResult> {
-  const accessToken = process.env.FACEBOOK_ACCESS_TOKEN;
-  const lastCheckedAt = new Date().toISOString();
   const { since, until } = getReportDateRange(preset);
-  if (!accessToken) {
+
+  try {
+    await ensureMetaInsightsReady(companyId, adAccountId, userId);
+  } catch (error) {
+    if (error instanceof MetaSyncNotConfiguredError) {
+      return {
+        adRows: [],
+        dailyRows: [],
+        lastCheckedAt: new Date().toISOString(),
+        message: error.message,
+        rows: [],
+        since,
+        state: "not_configured",
+        until,
+      };
+    }
+
     return {
       adRows: [],
       dailyRows: [],
-      lastCheckedAt,
-      message: "Defina FACEBOOK_ACCESS_TOKEN para habilitar o relatório de Vendas.",
+      lastCheckedAt: new Date().toISOString(),
+      message:
+        error instanceof Error
+          ? error.message
+          : "Não foi possível sincronizar os dados da Meta para o relatório de vendas.",
       rows: [],
       since,
-      state: "not_configured",
+      state: "error",
       until,
     };
   }
 
   try {
-    const campaigns = await findSalesCampaigns(accessToken, adAccountId);
+    const storedRows = await listStoredMetaInsights(companyId, adAccountId, since, until);
+    const salesRows = filterSalesRows(storedRows);
 
-    if (!campaigns.length) {
+    if (!salesRows.length) {
+      const hasSalesCampaigns = await hasStoredCampaignTag(companyId, adAccountId, SALES_CAMPAIGN_TAG);
+
+      if (!hasSalesCampaigns) {
+        return {
+          adRows: [],
+          dailyRows: [],
+          lastCheckedAt: new Date().toISOString(),
+          message: "Não há campanha com [VENDAS] na conta de anúncios selecionada.",
+          rows: [],
+          since,
+          state: "not_found",
+          until,
+        };
+      }
+
       return {
         adRows: [],
         dailyRows: [],
-        lastCheckedAt,
-        message: "Não há campanha com [VENDAS] na conta de anúncios selecionada.",
-        rows: [],
-        since,
-        state: "not_found",
-        until,
-      };
-    }
-
-    const [rows, dailyRows, adRows] = await Promise.all([
-      Promise.all(
-        campaigns.map((campaign) => fetchCampaignSalesInsight(accessToken, campaign, since, until))
-      ),
-      fetchDailySalesInsights(accessToken, adAccountId, since, until),
-      fetchAdSalesInsights(accessToken, adAccountId, since, until),
-    ]);
-
-    const campaignRows = rows
-      .filter((row): row is FacebookSalesRow => Boolean(row))
-      .sort((left, right) => left.campaignName.localeCompare(right.campaignName, "pt-BR"));
-
-    if (!campaignRows.length) {
-      return {
-        adRows: [],
-        dailyRows: [],
-        lastCheckedAt,
+        lastCheckedAt: new Date().toISOString(),
         rows: [],
         since,
         state: "empty",
@@ -494,10 +289,10 @@ export async function getFacebookSalesReport(
     }
 
     return {
-      adRows,
-      dailyRows,
-      lastCheckedAt,
-      rows: campaignRows,
+      adRows: buildAdRows(salesRows),
+      dailyRows: buildDailyRows(salesRows),
+      lastCheckedAt: getLatestSyncedAt(salesRows),
+      rows: buildCampaignRows(salesRows),
       since,
       state: "ok",
       until,
@@ -506,11 +301,11 @@ export async function getFacebookSalesReport(
     return {
       adRows: [],
       dailyRows: [],
-      lastCheckedAt,
+      lastCheckedAt: new Date().toISOString(),
       message:
         error instanceof Error
           ? error.message
-          : "Não foi possível consultar a API da Meta para o relatório de vendas.",
+          : "Não foi possível carregar os dados persistidos da Meta para o relatório de vendas.",
       rows: [],
       since,
       state: "error",
@@ -520,9 +315,11 @@ export async function getFacebookSalesReport(
 }
 
 export async function getFacebookSalesOverviewSummary(
-  adAccountId: string
+  companyId: string,
+  adAccountId: string,
+  userId: string
 ): Promise<FacebookSalesOverviewSummary> {
-  const report = await getFacebookSalesReport(adAccountId);
+  const report = await getFacebookSalesReport(companyId, adAccountId, userId);
 
   switch (report.state) {
     case "ok": {
@@ -559,6 +356,3 @@ export async function getFacebookSalesOverviewSummary(
       };
   }
 }
-
-
-

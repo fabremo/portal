@@ -1,4 +1,4 @@
-﻿create table public.webhook_logs (
+create table public.webhook_logs (
   id uuid primary key default gen_random_uuid(),
 
   webhook_id text not null unique,
@@ -232,3 +232,176 @@ add column if not exists last_processing_success_at timestamptz,
 add column if not exists last_reprocessing_result text,
 add column if not exists last_reprocessing_error text;
 
+create table public.meta_daily_ad_insights (
+  id uuid primary key default gen_random_uuid(),
+
+  company_id uuid not null references public.companies(id) on delete cascade,
+  ad_account_id text not null,
+
+  insight_date date not null,
+
+  campaign_id text,
+  campaign_name text,
+
+  adset_id text,
+  adset_name text,
+
+  ad_id text not null,
+  ad_name text,
+
+  spend numeric(14,2) not null default 0,
+  impressions integer not null default 0,
+  reach integer not null default 0,
+
+  clicks integer not null default 0,
+  inline_link_clicks integer not null default 0,
+  landing_page_views integer not null default 0,
+
+  purchases integer not null default 0,
+  purchase_value numeric(14,2) not null default 0,
+
+  leads integer not null default 0,
+  messaging_conversations_started integer not null default 0,
+
+  video_plays integer not null default 0,
+  video_play_actions integer not null default 0,
+  video_p25_watched integer not null default 0,
+  video_p50_watched integer not null default 0,
+  video_p75_watched integer not null default 0,
+  video_p95_watched integer not null default 0,
+  video_p100_watched integer not null default 0,
+  thruplays integer not null default 0,
+
+  raw_payload jsonb not null,
+
+  synced_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  unique (company_id, ad_account_id, insight_date, campaign_id, adset_id, ad_id)
+);
+
+
+create index idx_meta_daily_ad_insights_company_account_date
+  on public.meta_daily_ad_insights (company_id, ad_account_id, insight_date desc);
+
+create index idx_meta_daily_ad_insights_company_campaign_date
+  on public.meta_daily_ad_insights (company_id, campaign_id, insight_date desc);
+
+create index idx_meta_daily_ad_insights_company_ad_date
+  on public.meta_daily_ad_insights (company_id, ad_id, insight_date desc);
+
+create index idx_meta_daily_ad_insights_company_campaign_name
+  on public.meta_daily_ad_insights (company_id, campaign_name);
+
+create index idx_meta_daily_ad_insights_company_ad_name
+  on public.meta_daily_ad_insights (company_id, ad_name);
+
+create index idx_meta_daily_ad_insights_raw_payload_gin
+  on public.meta_daily_ad_insights
+  using gin (raw_payload);
+
+
+create table public.meta_sync_state (
+  id uuid primary key default gen_random_uuid(),
+
+  company_id uuid not null references public.companies(id) on delete cascade,
+  ad_account_id text not null,
+
+  status text not null default 'idle'
+    check (status in ('idle', 'running', 'failed')),
+
+  current_run_id uuid,
+  started_by_user_id uuid references public.profiles(id) on delete set null,
+
+  locked_at timestamptz,
+  lock_expires_at timestamptz,
+
+  sync_from_date date,
+  sync_until_date date,
+  last_synced_until date,
+
+  last_attempt_at timestamptz,
+  last_success_at timestamptz,
+  last_error text,
+
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  unique (company_id, ad_account_id)
+);
+
+create index idx_meta_sync_state_status
+  on public.meta_sync_state (status);
+
+create index idx_meta_sync_state_lock_expires_at
+  on public.meta_sync_state (lock_expires_at);
+
+create index idx_meta_sync_state_company_status
+  on public.meta_sync_state (company_id, status);
+
+create index idx_meta_sync_state_company_account
+  on public.meta_sync_state (company_id, ad_account_id);
+
+
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_meta_sync_state_set_updated_at
+on public.meta_sync_state;
+
+create trigger trg_meta_sync_state_set_updated_at
+before update on public.meta_sync_state
+for each row
+execute function public.set_updated_at();
+
+create table public.company_ad_accounts (
+  id uuid primary key default gen_random_uuid(),
+
+  company_id uuid not null references public.companies(id) on delete cascade,
+  ad_account_id text not null,
+
+  ad_account_name text,
+  is_active boolean not null default true,
+
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  unique (company_id, ad_account_id)
+);
+
+create index idx_company_ad_accounts_company_id
+  on public.company_ad_accounts (company_id);
+
+create index idx_company_ad_accounts_ad_account_id
+  on public.company_ad_accounts (ad_account_id);
+
+create index idx_company_ad_accounts_company_active
+  on public.company_ad_accounts (company_id, is_active);
+
+alter table public.meta_daily_ad_insights enable row level security;
+alter table public.meta_sync_state enable row level security;
+alter table public.company_ad_accounts enable row level security;
+
+drop trigger if exists trg_meta_daily_ad_insights_set_updated_at
+on public.meta_daily_ad_insights;
+
+create trigger trg_meta_daily_ad_insights_set_updated_at
+before update on public.meta_daily_ad_insights
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists trg_company_ad_accounts_set_updated_at
+on public.company_ad_accounts;
+
+create trigger trg_company_ad_accounts_set_updated_at
+before update on public.company_ad_accounts
+for each row
+execute function public.set_updated_at();

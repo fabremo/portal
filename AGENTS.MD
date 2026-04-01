@@ -38,6 +38,8 @@ Do not rely only on memory when the answer may have changed.
 - Keep all edited text files in UTF-8.
 - When adding or changing labels, messages, headings, metadata, placeholders, or CTAs in Portuguese, review accentuation and encoding before finishing.
 - Treat mojibake or missing accent marks in user-facing copy as defects to be fixed.
+- After editing any file with PT-BR text, inspect the final file content and confirm it did not introduce sequences like `Ã`, `Â` or `�` in visible text.
+- Avoid file-editing flows that can silently rewrite text with the wrong encoding.
 
 ## Next.js rules
 - Treat Next.js as version-sensitive.

@@ -25,6 +25,22 @@ type CompanyProductRow = {
   updated_at: string;
 };
 
+type CompanyAdAccountBindingRow = {
+  ad_account_id: string;
+  ad_account_name: string | null;
+  company_id: string;
+  created_at: string;
+  id: string;
+  is_active: boolean;
+  updated_at: string;
+};
+
+type AdAccountRow = {
+  id: string;
+  is_active: boolean;
+  name: string;
+};
+
 type ProfileRow = {
   id: string;
 };
@@ -55,8 +71,27 @@ export type CompanySettingsProduct = {
   updatedAt: string;
 };
 
+export type CompanySettingsAdAccountBinding = {
+  adAccountId: string;
+  adAccountName: string;
+  companyId: string;
+  createdAt: string;
+  id: string;
+  isActive: boolean;
+  updatedAt: string;
+};
+
+export type CompanySettingsAvailableAdAccount = {
+  id: string;
+  isActive: boolean;
+  isBound: boolean;
+  name: string;
+};
+
 export type CompanySettingsCompany = {
+  activeAdAccountCount: number;
   activeProductCount: number;
+  adAccounts: CompanySettingsAdAccountBinding[];
   createdAt: string;
   id: string;
   memberCount: number;
@@ -67,6 +102,7 @@ export type CompanySettingsCompany = {
 };
 
 export type CompanySettingsData = {
+  availableAdAccounts: CompanySettingsAvailableAdAccount[];
   companies: CompanySettingsCompany[];
   users: CompanySettingsUser[];
 };
@@ -112,7 +148,15 @@ export async function getCompanySettingsData(): Promise<CompanySettingsData> {
     throw new Error("Configuração do Supabase incompleta.");
   }
 
-  const [companiesResponse, membershipsResponse, productsResponse, profilesResponse, authUsers] = await Promise.all([
+  const [
+    companiesResponse,
+    membershipsResponse,
+    productsResponse,
+    companyAdAccountsResponse,
+    adAccountsResponse,
+    profilesResponse,
+    authUsers,
+  ] = await Promise.all([
     supabase.from("companies").select("id, name, slug, created_at").order("name", { ascending: true }),
     supabase.from("user_companies").select("company_id, user_id"),
     supabase
@@ -121,6 +165,11 @@ export async function getCompanySettingsData(): Promise<CompanySettingsData> {
         "id, company_id, hotmart_product_id, hotmart_product_ucode, product_name, is_active, created_at, updated_at"
       )
       .order("product_name", { ascending: true }),
+    supabase
+      .from("company_ad_accounts")
+      .select("id, company_id, ad_account_id, ad_account_name, is_active, created_at, updated_at")
+      .order("ad_account_name", { ascending: true }),
+    supabase.from("ad_accounts").select("id, name, is_active").order("name", { ascending: true }),
     supabase.from("profiles").select("id"),
     listAllAuthUsers(),
   ]);
@@ -135,6 +184,14 @@ export async function getCompanySettingsData(): Promise<CompanySettingsData> {
 
   if (productsResponse.error) {
     throw new Error("Não foi possível carregar os produtos cadastrados.");
+  }
+
+  if (companyAdAccountsResponse.error) {
+    throw new Error("Não foi possível carregar as contas de anúncio vinculadas.");
+  }
+
+  if (adAccountsResponse.error) {
+    throw new Error("Não foi possível carregar as contas de anúncio disponíveis.");
   }
 
   if (profilesResponse.error) {
@@ -183,6 +240,35 @@ export async function getCompanySettingsData(): Promise<CompanySettingsData> {
     productsByCompanyId.set(product.company_id, companyProducts);
   }
 
+  const adAccountsByCompanyId = new Map<string, CompanySettingsAdAccountBinding[]>();
+  const boundAccountIds = new Set<string>();
+
+  for (const binding of (companyAdAccountsResponse.data ?? []) as CompanyAdAccountBindingRow[]) {
+    const companyBindings = adAccountsByCompanyId.get(binding.company_id) ?? [];
+
+    companyBindings.push({
+      adAccountId: binding.ad_account_id,
+      adAccountName: binding.ad_account_name || "Conta sem nome",
+      companyId: binding.company_id,
+      createdAt: binding.created_at,
+      id: binding.id,
+      isActive: binding.is_active,
+      updatedAt: binding.updated_at,
+    });
+
+    adAccountsByCompanyId.set(binding.company_id, companyBindings);
+    boundAccountIds.add(binding.ad_account_id);
+  }
+
+  const availableAdAccounts = ((adAccountsResponse.data ?? []) as AdAccountRow[])
+    .map((account) => ({
+      id: account.id,
+      isActive: account.is_active,
+      isBound: boundAccountIds.has(account.id),
+      name: account.name || "Conta sem nome",
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
+
   const companies = ((companiesResponse.data ?? []) as CompanyRow[])
     .map((company) => {
       const memberships = (membershipsByCompanyId.get(company.id) ?? []).sort((left, right) =>
@@ -195,9 +281,18 @@ export async function getCompanySettingsData(): Promise<CompanySettingsData> {
 
         return left.productName.localeCompare(right.productName, "pt-BR");
       });
+      const adAccounts = (adAccountsByCompanyId.get(company.id) ?? []).sort((left, right) => {
+        if (left.isActive !== right.isActive) {
+          return left.isActive ? -1 : 1;
+        }
+
+        return left.adAccountName.localeCompare(right.adAccountName, "pt-BR");
+      });
 
       return {
+        activeAdAccountCount: adAccounts.filter((adAccount) => adAccount.isActive).length,
         activeProductCount: products.filter((product) => product.isActive).length,
+        adAccounts,
         createdAt: company.created_at,
         id: company.id,
         memberCount: memberships.length,
@@ -210,6 +305,7 @@ export async function getCompanySettingsData(): Promise<CompanySettingsData> {
     .sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
 
   return {
+    availableAdAccounts,
     companies,
     users,
   };

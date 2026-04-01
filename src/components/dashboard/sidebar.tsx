@@ -20,6 +20,7 @@ import {
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { AccountSwitcher } from "@/components/dashboard/account-switcher";
+import { CompanySwitcher } from "@/components/dashboard/company-switcher";
 
 type AccessibleAdAccount = {
   id: string;
@@ -27,9 +28,17 @@ type AccessibleAdAccount = {
   name: string;
 };
 
+type AccessibleCompany = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
 type DashboardSidebarProps = {
   accessibleAccounts: AccessibleAdAccount[];
+  accessibleCompanies: AccessibleCompany[];
   activeAdAccount: AccessibleAdAccount | null;
+  activeCompany: AccessibleCompany | null;
   canAccessBuyersModule: boolean;
   isAdmin: boolean;
   isCollapsed: boolean;
@@ -184,7 +193,9 @@ function renderGroupButton({
 
 export function DashboardSidebar({
   accessibleAccounts,
+  accessibleCompanies,
   activeAdAccount,
+  activeCompany,
   canAccessBuyersModule,
   isAdmin,
   isCollapsed,
@@ -246,22 +257,32 @@ export function DashboardSidebar({
           <div className="flex justify-center">
             <div
               className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/8 text-sm font-medium text-white"
-              title={activeAdAccount ? activeAdAccount.name : "Nenhuma conta liberada"}
+              title={activeAdAccount ? activeAdAccount.name : activeCompany?.name ?? "Nenhuma conta liberada"}
             >
-              {(activeAdAccount?.name ?? "-").slice(0, 1).toUpperCase()}
+              {(activeAdAccount?.name ?? activeCompany?.name ?? "-").slice(0, 1).toUpperCase()}
             </div>
           </div>
-        ) : accessibleAccounts.length > 1 && activeAdAccount ? (
-          <AccountSwitcher accounts={accessibleAccounts} activeAccountId={activeAdAccount.id} />
-        ) : activeAdAccount ? (
-          <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.22em] text-white/55">Conta de anúncio</p>
-            <p className="text-sm font-medium text-white">{activeAdAccount.name}</p>
-          </div>
         ) : (
-          <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.22em] text-white/55">Conta de anúncio</p>
-            <p className="text-sm text-white/70">Nenhuma conta liberada</p>
+          <div className="space-y-4">
+            {isAdmin && activeCompany ? (
+              <CompanySwitcher activeCompanyId={activeCompany.id} companies={accessibleCompanies} />
+            ) : null}
+
+            {accessibleAccounts.length > 1 && activeAdAccount ? (
+              <AccountSwitcher accounts={accessibleAccounts} activeAccountId={activeAdAccount.id} />
+            ) : activeAdAccount ? (
+              <div className="space-y-2">
+                <p className="text-xs uppercase tracking-[0.22em] text-white/55">Conta de anúncio</p>
+                <p className="text-sm font-medium text-white">{activeAdAccount.name}</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs uppercase tracking-[0.22em] text-white/55">Conta de anúncio</p>
+                <p className="text-sm text-white/70">
+                  {activeCompany ? "Nenhuma conta vinculada à empresa selecionada" : "Nenhuma conta liberada"}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

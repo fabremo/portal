@@ -22,12 +22,21 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
       <main className="page-shell px-4 py-6 md:px-6 lg:px-8">
         <DashboardShell
           accessibleAccounts={accessContext.accessibleAccounts}
+          accessibleCompanies={accessContext.accessibleCompanies}
           activeAdAccount={accessContext.activeAdAccount}
+          activeCompany={accessContext.activeCompany}
           canAccessBuyersModule={canAccessBuyersModule(accessContext)}
           isAdmin={accessContext.isAdmin}
           userEmail={accessContext.userEmail}
         >
-          {accessContext.activeAdAccount || accessContext.isAdmin ? children : <NoAdAccountAccess />}
+          {accessContext.activeAdAccount ? (
+            children
+          ) : (
+            <NoAdAccountAccess
+              activeCompanyName={accessContext.activeCompany?.name ?? null}
+              isAdmin={accessContext.isAdmin}
+            />
+          )}
         </DashboardShell>
       </main>
     </MetaReportsProvider>

@@ -11,9 +11,17 @@ type AccessibleAdAccount = {
   name: string;
 };
 
+type AccessibleCompany = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
 type DashboardShellProps = {
   accessibleAccounts: AccessibleAdAccount[];
+  accessibleCompanies: AccessibleCompany[];
   activeAdAccount: AccessibleAdAccount | null;
+  activeCompany: AccessibleCompany | null;
   canAccessBuyersModule: boolean;
   children: ReactNode;
   isAdmin: boolean;
@@ -51,7 +59,9 @@ function getServerSnapshot() {
 
 export function DashboardShell({
   accessibleAccounts,
+  accessibleCompanies,
   activeAdAccount,
+  activeCompany,
   canAccessBuyersModule,
   children,
   isAdmin,
@@ -74,7 +84,9 @@ export function DashboardShell({
     >
       <DashboardSidebar
         accessibleAccounts={accessibleAccounts}
+        accessibleCompanies={accessibleCompanies}
         activeAdAccount={activeAdAccount}
+        activeCompany={activeCompany}
         canAccessBuyersModule={canAccessBuyersModule}
         isAdmin={isAdmin}
         isCollapsed={isCollapsed}
@@ -85,4 +97,3 @@ export function DashboardShell({
     </div>
   );
 }
-

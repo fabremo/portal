@@ -1,4 +1,4 @@
-﻿"use server";
+"use server";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -128,6 +128,40 @@ async function ensureUniqueHotmartProductId(hotmartProductId: number, currentPro
   }
 
   if (data && data.id !== currentProductId) {
+    return false;
+  }
+
+  return true;
+}
+
+async function ensureAdAccountExists(adAccountId: string) {
+  const supabase = await ensureServiceRoleClient();
+  const { data, error } = await supabase
+    .from("ad_accounts")
+    .select("id, name")
+    .eq("id", adAccountId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Não foi possível validar a conta de anúncios selecionada.");
+  }
+
+  return data as { id: string; name: string | null } | null;
+}
+
+async function ensureUniqueCompanyAdAccount(adAccountId: string, currentBindingId?: string) {
+  const supabase = await ensureServiceRoleClient();
+  const { data, error } = await supabase
+    .from("company_ad_accounts")
+    .select("id")
+    .eq("ad_account_id", adAccountId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Não foi possível validar a conta de anúncios informada.");
+  }
+
+  if (data && data.id !== currentBindingId) {
     return false;
   }
 
@@ -536,6 +570,131 @@ export async function toggleCompanyProductActiveAction(formData: FormData) {
     message: nextIsActive
       ? "Produto Hotmart reativado com sucesso."
       : "Produto Hotmart desativado com sucesso.",
+    status: "success",
+  });
+}
+
+export async function createCompanyAdAccountAction(formData: FormData) {
+  await ensureAdminAccess();
+
+  const companyId = getTrimmedString(formData, "companyId");
+  const adAccountId = getTrimmedString(formData, "adAccountId");
+  const isActive = isChecked(formData, "isActive");
+
+  if (!companyId) {
+    redirectToSettings({
+      message: "Selecione uma empresa para vincular a conta de anúncios.",
+      status: "error",
+    });
+  }
+
+  const companyExists = await ensureCompanyExists(companyId);
+
+  if (!companyExists) {
+    redirectToSettings({
+      message: "A empresa selecionada não foi encontrada.",
+      status: "error",
+    });
+  }
+
+  if (!adAccountId) {
+    redirectToSettings({
+      companyId,
+      message: "Selecione uma conta de anúncios antes de salvar.",
+      status: "error",
+    });
+  }
+
+  const adAccount = await ensureAdAccountExists(adAccountId);
+
+  if (!adAccount) {
+    redirectToSettings({
+      companyId,
+      message: "A conta de anúncios selecionada não foi encontrada.",
+      status: "error",
+    });
+  }
+
+  const isUniqueBinding = await ensureUniqueCompanyAdAccount(adAccountId);
+
+  if (!isUniqueBinding) {
+    redirectToSettings({
+      companyId,
+      message: "Esta conta de anúncios já está vinculada a outra empresa.",
+      status: "error",
+    });
+  }
+
+  const supabase = await ensureServiceRoleClient();
+  const { error } = await supabase.from("company_ad_accounts").insert({
+    ad_account_id: adAccountId,
+    ad_account_name: adAccount.name || "Conta sem nome",
+    company_id: companyId,
+    is_active: isActive,
+  });
+
+  if (error?.code === UNIQUE_VIOLATION_ERROR_CODE) {
+    redirectToSettings({
+      companyId,
+      message: "Esta conta de anúncios já está vinculada a outra empresa.",
+      status: "error",
+    });
+  }
+
+  if (error) {
+    redirectToSettings({
+      companyId,
+      message: "Não foi possível vincular a conta de anúncios.",
+      status: "error",
+    });
+  }
+
+  revalidatePath(SETTINGS_PATH);
+  redirectToSettings({
+    companyId,
+    message: "Conta de anúncios vinculada com sucesso.",
+    status: "success",
+  });
+}
+
+export async function toggleCompanyAdAccountActiveAction(formData: FormData) {
+  await ensureAdminAccess();
+
+  const bindingId = getTrimmedString(formData, "bindingId");
+  const companyId = getTrimmedString(formData, "companyId");
+  const nextIsActive = getTrimmedString(formData, "nextIsActive") === "true";
+
+  if (!bindingId) {
+    redirectToSettings({
+      companyId,
+      message: "Selecione um vínculo válido antes de alterar o status.",
+      status: "error",
+    });
+  }
+
+  const supabase = await ensureServiceRoleClient();
+  const { error } = await supabase
+    .from("company_ad_accounts")
+    .update({
+      is_active: nextIsActive,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", bindingId);
+
+  if (error) {
+    redirectToSettings({
+      companyId,
+      message: "Não foi possível atualizar o status da conta de anúncios.",
+      status: "error",
+    });
+  }
+
+  revalidatePath(SETTINGS_PATH);
+  redirectToSettings({
+    companyId,
+    message: nextIsActive
+      ? "Conta de anúncios reativada com sucesso."
+      : "Conta de anúncios desativada com sucesso.",
     status: "success",
   });
 }

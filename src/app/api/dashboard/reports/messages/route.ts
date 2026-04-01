@@ -22,6 +22,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: "Conta de anúncios não autorizada." }, { status: 403 });
   }
 
-  const report = await getFacebookMessagesReport(adAccountId);
+  const companyId = accessContext.accountCompanyIds[adAccountId];
+
+  if (!companyId) {
+    return NextResponse.json(
+      { message: "A conta de anúncios selecionada não está vinculada a nenhuma empresa." },
+      { status: 400 }
+    );
+  }
+
+  const report = await getFacebookMessagesReport(companyId, adAccountId, accessContext.userId);
   return NextResponse.json(report);
 }

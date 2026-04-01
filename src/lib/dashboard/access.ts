@@ -7,6 +7,7 @@ import { createServiceRoleSupabaseClient } from "@/lib/supabase/service-role";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const ACTIVE_AD_ACCOUNT_COOKIE_NAME = "portal_active_ad_account";
+export const ACTIVE_COMPANY_COOKIE_NAME = "portal_active_company";
 export type UserRole = "admin" | "common";
 
 export type AccessibleAdAccount = {
@@ -25,7 +26,10 @@ export type DashboardAccessContext = {
   accessibleAccounts: AccessibleAdAccount[];
   accessibleCompanies: AccessibleCompany[];
   accessibleCompanyIds: string[];
+  accountCompanyIds: Record<string, string>;
   activeAdAccount: AccessibleAdAccount | null;
+  activeCompany: AccessibleCompany | null;
+  activeCompanyId: string | null;
   isAdmin: boolean;
   role: UserRole;
   userEmail: string;
@@ -58,16 +62,20 @@ type UserCompanyRow = {
   companies: CompanyRow[] | CompanyRow | null;
 };
 
+type CompanyAdAccountRow = {
+  ad_account_id: string;
+  ad_account_name: string | null;
+  company_id: string;
+  is_active: boolean;
+};
+
 export function canAccessBuyersModule(
   accessContext: Pick<DashboardAccessContext, "accessibleCompanyIds" | "isAdmin">
 ) {
   return accessContext.isAdmin || accessContext.accessibleCompanyIds.length > 0;
 }
 
-function resolveActiveAdAccount(
-  accessibleAccounts: AccessibleAdAccount[],
-  cookieAccountId?: string
-) {
+function resolveActiveAdAccount(accessibleAccounts: AccessibleAdAccount[], cookieAccountId?: string) {
   if (!accessibleAccounts.length) {
     return null;
   }
@@ -85,6 +93,32 @@ function resolveActiveAdAccount(
   }
 
   return accessibleAccounts[0];
+}
+
+function resolveActiveCompany(
+  accessibleCompanies: AccessibleCompany[],
+  cookieCompanyId?: string,
+  preferredCompanyIds: string[] = []
+) {
+  if (!accessibleCompanies.length) {
+    return null;
+  }
+
+  const cookieSelectedCompany = accessibleCompanies.find((company) => company.id === cookieCompanyId);
+
+  if (cookieSelectedCompany) {
+    return cookieSelectedCompany;
+  }
+
+  for (const companyId of preferredCompanyIds) {
+    const preferredCompany = accessibleCompanies.find((company) => company.id === companyId);
+
+    if (preferredCompany) {
+      return preferredCompany;
+    }
+  }
+
+  return accessibleCompanies[0];
 }
 
 function getJoinedAdAccount(row: UserAdAccountRow) {
@@ -138,13 +172,13 @@ function mapUserAdAccountRows(data: UserAdAccountRow[]) {
     .sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
 }
 
-function mapAdminAccounts(data: JoinedAdAccount[]) {
+function mapCompanyBindingAccounts(data: CompanyAdAccountRow[]) {
   return data
-    .filter((account) => account.is_active)
-    .map((account) => ({
-      id: account.id,
+    .filter((row) => row.is_active)
+    .map((row) => ({
+      id: row.ad_account_id,
       isDefault: false,
-      name: account.name || "Conta sem nome",
+      name: row.ad_account_name || "Conta sem nome",
     }))
     .sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
 }
@@ -157,7 +191,10 @@ async function resolveAccessibleCompanies(isAdmin: boolean, userId: string) {
   }
 
   if (isAdmin) {
-    const { data, error } = await supabase.from("companies").select("id, name, slug").order("name", { ascending: true });
+    const { data, error } = await supabase
+      .from("companies")
+      .select("id, name, slug")
+      .order("name", { ascending: true });
 
     if (error) {
       throw new Error("Não foi possível carregar as empresas disponíveis para o usuário.");
@@ -201,6 +238,36 @@ async function resolveAccessibleCompanies(isAdmin: boolean, userId: string) {
   return uniqueCompanies.sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
 }
 
+async function resolveCompanyAdAccountBindings(companyIds: string[], accountIds?: string[]) {
+  if (!companyIds.length) {
+    return [] as CompanyAdAccountRow[];
+  }
+
+  const supabase = createServiceRoleSupabaseClient();
+
+  if (!supabase) {
+    return [] as CompanyAdAccountRow[];
+  }
+
+  let query = supabase
+    .from("company_ad_accounts")
+    .select("ad_account_id, ad_account_name, company_id, is_active")
+    .in("company_id", companyIds)
+    .eq("is_active", true);
+
+  if (accountIds?.length) {
+    query = query.in("ad_account_id", accountIds);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error("Não foi possível carregar os vínculos entre empresas e contas de anúncio.");
+  }
+
+  return (data ?? []) as CompanyAdAccountRow[];
+}
+
 export const getDashboardAccessContext = cache(async (): Promise<DashboardAccessContext | null> => {
   const supabase = await createServerSupabaseClient();
 
@@ -219,7 +286,7 @@ export const getDashboardAccessContext = cache(async (): Promise<DashboardAccess
   const role = await resolveUserRole(supabase, user.id);
   const isAdmin = role === "admin";
   const accountQuery = isAdmin
-    ? supabase.from("ad_accounts").select("id, is_active, name").eq("is_active", true)
+    ? null
     : supabase
         .from("user_ad_accounts")
         .select(
@@ -237,27 +304,80 @@ export const getDashboardAccessContext = cache(async (): Promise<DashboardAccess
         .eq("is_active", true)
         .eq("ad_accounts.is_active", true);
 
-  const [{ data, error }, accessibleCompanies] = await Promise.all([
-    accountQuery,
+  const [accountResult, accessibleCompanies] = await Promise.all([
+    accountQuery ? accountQuery : Promise.resolve({ data: null, error: null }),
     resolveAccessibleCompanies(isAdmin, user.id),
   ]);
 
-  if (error) {
+  if (accountResult?.error) {
     throw new Error("Não foi possível carregar as contas de anúncio do usuário.");
   }
 
-  const accessibleAccounts = isAdmin
-    ? mapAdminAccounts((data ?? []) as JoinedAdAccount[])
-    : mapUserAdAccountRows((data ?? []) as UserAdAccountRow[]);
-
   const cookieStore = await cookies();
   const cookieAccountId = cookieStore.get(ACTIVE_AD_ACCOUNT_COOKIE_NAME)?.value;
+  const cookieCompanyId = cookieStore.get(ACTIVE_COMPANY_COOKIE_NAME)?.value;
+
+  if (isAdmin) {
+    const companyBindings = await resolveCompanyAdAccountBindings(
+      accessibleCompanies.map((company) => company.id)
+    );
+    const companyIdsWithAccounts = Array.from(new Set(companyBindings.map((binding) => binding.company_id)));
+    const activeCompany = resolveActiveCompany(accessibleCompanies, cookieCompanyId, companyIdsWithAccounts);
+    const accessibleAccounts = activeCompany
+      ? mapCompanyBindingAccounts(companyBindings.filter((binding) => binding.company_id === activeCompany.id))
+      : [];
+    const activeAdAccount = resolveActiveAdAccount(accessibleAccounts, cookieAccountId);
+    const activeCompanyId = activeCompany?.id ?? null;
+
+    return {
+      accessibleAccounts,
+      accessibleCompanies,
+      accessibleCompanyIds: accessibleCompanies.map((company) => company.id),
+      accountCompanyIds: Object.fromEntries(
+        accessibleAccounts.map((account) => [account.id, activeCompanyId ?? ""])
+      ),
+      activeAdAccount,
+      activeCompany,
+      activeCompanyId,
+      isAdmin,
+      role,
+      userEmail: user.email || "usuario@empresa.com",
+      userId: user.id,
+    };
+  }
+
+  const rawAccessibleAccounts = mapUserAdAccountRows((accountResult?.data ?? []) as UserAdAccountRow[]);
+  const companyAccountBindings = await resolveCompanyAdAccountBindings(
+    accessibleCompanies.map((company) => company.id),
+    rawAccessibleAccounts.map((account) => account.id)
+  );
+  const companyByAccountId = new Map(
+    companyAccountBindings.map((binding) => [binding.ad_account_id, binding.company_id])
+  );
+  const accountNameById = new Map(
+    companyAccountBindings
+      .filter((binding) => binding.ad_account_name)
+      .map((binding) => [binding.ad_account_id, binding.ad_account_name as string])
+  );
+  const accessibleAccounts = rawAccessibleAccounts
+    .filter((account) => companyByAccountId.has(account.id))
+    .map((account) => ({
+      ...account,
+      name: accountNameById.get(account.id) || account.name,
+    }));
+  const activeAdAccount = resolveActiveAdAccount(accessibleAccounts, cookieAccountId);
+  const activeCompanyId = activeAdAccount ? companyByAccountId.get(activeAdAccount.id) ?? null : null;
+  const activeCompany =
+    activeCompanyId ? accessibleCompanies.find((company) => company.id === activeCompanyId) ?? null : null;
 
   return {
     accessibleAccounts,
     accessibleCompanies,
     accessibleCompanyIds: accessibleCompanies.map((company) => company.id),
-    activeAdAccount: resolveActiveAdAccount(accessibleAccounts, cookieAccountId),
+    accountCompanyIds: Object.fromEntries(companyByAccountId.entries()),
+    activeAdAccount,
+    activeCompany,
+    activeCompanyId,
     isAdmin,
     role,
     userEmail: user.email || "usuario@empresa.com",

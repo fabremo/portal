@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 
 import { MessagesReportContent } from "@/components/dashboard/messages-report-content";
 import { getDashboardAccessContext } from "@/lib/dashboard/access";
@@ -11,11 +11,15 @@ export const metadata: Metadata = {
 export default async function MessagesReportPage() {
   const accessContext = await getDashboardAccessContext();
 
-  if (!accessContext?.activeAdAccount) {
+  if (!accessContext?.activeAdAccount || !accessContext.activeCompanyId) {
     return null;
   }
 
-  const initialReport = await getFacebookMessagesReport(accessContext.activeAdAccount.id);
+  const initialReport = await getFacebookMessagesReport(
+    accessContext.activeCompanyId,
+    accessContext.activeAdAccount.id,
+    accessContext.userId
+  );
 
   return (
     <MessagesReportContent

@@ -1,51 +1,16 @@
-import "server-only";
+﻿import "server-only";
 
+import {
+  ensureMetaInsightsReady,
+  hasStoredCampaignTag,
+  listStoredMetaInsights,
+  MetaSyncNotConfiguredError,
+} from "@/lib/facebook/meta-insights";
 import { getReportDateRange } from "@/lib/facebook/report-date-range";
 
-const META_GRAPH_VERSION = "v25.0";
 const MESSAGES_CAMPAIGN_TAG = "[WHATS]";
 
-type MetaAction = {
-  action_type?: string;
-  value?: string;
-};
-
-type MetaCampaign = {
-  id: string;
-  name: string;
-};
-
-type MetaCampaignResponse = {
-  data?: MetaCampaign[];
-  error?: {
-    message?: string;
-  };
-  paging?: {
-    next?: string;
-  };
-};
-
-type MetaInsightRow = {
-  ad_id?: string;
-  ad_name?: string;
-  actions?: MetaAction[];
-  campaign_id?: string;
-  campaign_name?: string;
-  date_start?: string;
-  impressions?: string;
-  inline_link_clicks?: string;
-  spend?: string;
-};
-
-type MetaInsightResponse = {
-  data?: MetaInsightRow[];
-  error?: {
-    message?: string;
-  };
-  paging?: {
-    next?: string;
-  };
-};
+type StoredInsightRow = Awaited<ReturnType<typeof listStoredMetaInsights>>[number];
 
 export type FacebookMessagesCampaignRow = {
   amountSpent: number;
@@ -102,59 +67,86 @@ export type FacebookMessagesReportResult =
       until: string;
     };
 
-
-
-function parseNumber(value?: string | number | null) {
-  const parsed = Number(value ?? 0);
-  return Number.isFinite(parsed) ? parsed : 0;
+function getLatestSyncedAt(rows: StoredInsightRow[]) {
+  return rows.reduce((latest, row) => {
+    return row.synced_at > latest ? row.synced_at : latest;
+  }, rows[0]?.synced_at ?? new Date().toISOString());
 }
 
-function extractStartedMessages(actions?: MetaAction[]) {
-  if (!actions?.length) {
-    return 0;
-  }
-
-  const match = actions.find((action) =>
-    action.action_type?.includes("messaging_conversation_started")
-  );
-
-  return parseNumber(match?.value);
+function filterMessageRows(rows: StoredInsightRow[]) {
+  return rows.filter((row) => row.campaign_name?.includes(MESSAGES_CAMPAIGN_TAG));
 }
 
-function buildDailyRows(rows: MetaInsightRow[]) {
-  const groupedRows = new Map<string, FacebookMessagesDailyRow>();
+function buildCampaignRows(rows: StoredInsightRow[]) {
+  const groupedRows = new Map<string, FacebookMessagesCampaignRow>();
 
   for (const row of rows) {
-    const date = row.date_start;
-
-    if (!date) {
-      continue;
-    }
-
-    const amountSpent = parseNumber(row.spend);
-    const startedMessages = extractStartedMessages(row.actions);
-    const linkClicks = parseNumber(row.inline_link_clicks);
-    const impressions = parseNumber(row.impressions);
-    const existingRow = groupedRows.get(date);
+    const campaignId = row.campaign_id || row.campaign_name || "campanha-sem-id";
+    const campaignName = row.campaign_name || "Campanha sem nome";
+    const existingRow = groupedRows.get(campaignId);
 
     if (!existingRow) {
-      groupedRows.set(date, {
-        amountSpent,
-        costPerLinkClick: linkClicks > 0 ? amountSpent / linkClicks : null,
-        costPerStartedMessage: startedMessages > 0 ? amountSpent / startedMessages : null,
-        date,
-        impressions,
-        linkClicks,
-        linkCtr: impressions > 0 ? (linkClicks / impressions) * 100 : null,
-        startedMessages,
+      groupedRows.set(campaignId, {
+        amountSpent: row.spend,
+        campaignId,
+        campaignName,
+        costPerLinkClick: row.inline_link_clicks > 0 ? row.spend / row.inline_link_clicks : null,
+        costPerStartedMessage:
+          row.messaging_conversations_started > 0
+            ? row.spend / row.messaging_conversations_started
+            : null,
+        impressions: row.impressions,
+        linkClicks: row.inline_link_clicks,
+        linkCtr: row.impressions > 0 ? (row.inline_link_clicks / row.impressions) * 100 : null,
+        startedMessages: row.messaging_conversations_started,
       });
       continue;
     }
 
-    existingRow.amountSpent += amountSpent;
-    existingRow.startedMessages += startedMessages;
-    existingRow.impressions += impressions;
-    existingRow.linkClicks += linkClicks;
+    existingRow.amountSpent += row.spend;
+    existingRow.impressions += row.impressions;
+    existingRow.linkClicks += row.inline_link_clicks;
+    existingRow.startedMessages += row.messaging_conversations_started;
+    existingRow.costPerLinkClick =
+      existingRow.linkClicks > 0 ? existingRow.amountSpent / existingRow.linkClicks : null;
+    existingRow.costPerStartedMessage =
+      existingRow.startedMessages > 0 ? existingRow.amountSpent / existingRow.startedMessages : null;
+    existingRow.linkCtr =
+      existingRow.impressions > 0 ? (existingRow.linkClicks / existingRow.impressions) * 100 : null;
+  }
+
+  return Array.from(groupedRows.values()).sort((left, right) =>
+    left.campaignName.localeCompare(right.campaignName, "pt-BR")
+  );
+}
+
+function buildDailyRows(rows: StoredInsightRow[]) {
+  const groupedRows = new Map<string, FacebookMessagesDailyRow>();
+
+  for (const row of rows) {
+    const existingRow = groupedRows.get(row.insight_date);
+
+    if (!existingRow) {
+      groupedRows.set(row.insight_date, {
+        amountSpent: row.spend,
+        costPerLinkClick: row.inline_link_clicks > 0 ? row.spend / row.inline_link_clicks : null,
+        costPerStartedMessage:
+          row.messaging_conversations_started > 0
+            ? row.spend / row.messaging_conversations_started
+            : null,
+        date: row.insight_date,
+        impressions: row.impressions,
+        linkClicks: row.inline_link_clicks,
+        linkCtr: row.impressions > 0 ? (row.inline_link_clicks / row.impressions) * 100 : null,
+        startedMessages: row.messaging_conversations_started,
+      });
+      continue;
+    }
+
+    existingRow.amountSpent += row.spend;
+    existingRow.impressions += row.impressions;
+    existingRow.linkClicks += row.inline_link_clicks;
+    existingRow.startedMessages += row.messaging_conversations_started;
     existingRow.costPerLinkClick =
       existingRow.linkClicks > 0 ? existingRow.amountSpent / existingRow.linkClicks : null;
     existingRow.costPerStartedMessage =
@@ -168,7 +160,7 @@ function buildDailyRows(rows: MetaInsightRow[]) {
   );
 }
 
-function buildAdRows(rows: MetaInsightRow[]) {
+function buildAdRows(rows: StoredInsightRow[]) {
   const groupedRows = new Map<
     string,
     {
@@ -187,27 +179,23 @@ function buildAdRows(rows: MetaInsightRow[]) {
       continue;
     }
 
-    const amountSpent = parseNumber(row.spend);
-    const impressions = parseNumber(row.impressions);
-    const linkClicks = parseNumber(row.inline_link_clicks);
-    const startedMessages = extractStartedMessages(row.actions);
     const existingRow = groupedRows.get(adName);
 
     if (!existingRow) {
       groupedRows.set(adName, {
         adName,
-        amountSpent,
-        impressions,
-        linkClicks,
-        startedMessages,
+        amountSpent: row.spend,
+        impressions: row.impressions,
+        linkClicks: row.inline_link_clicks,
+        startedMessages: row.messaging_conversations_started,
       });
       continue;
     }
 
-    existingRow.amountSpent += amountSpent;
-    existingRow.impressions += impressions;
-    existingRow.linkClicks += linkClicks;
-    existingRow.startedMessages += startedMessages;
+    existingRow.amountSpent += row.spend;
+    existingRow.impressions += row.impressions;
+    existingRow.linkClicks += row.inline_link_clicks;
+    existingRow.startedMessages += row.messaging_conversations_started;
   }
 
   return Array.from(groupedRows.values())
@@ -215,7 +203,8 @@ function buildAdRows(rows: MetaInsightRow[]) {
       adName: row.adName,
       amountSpent: row.amountSpent,
       costPerLinkClick: row.linkClicks > 0 ? row.amountSpent / row.linkClicks : null,
-      costPerStartedMessage: row.startedMessages > 0 ? row.amountSpent / row.startedMessages : null,
+      costPerStartedMessage:
+        row.startedMessages > 0 ? row.amountSpent / row.startedMessages : null,
       linkCtr: row.impressions > 0 ? (row.linkClicks / row.impressions) * 100 : null,
       startedMessages: row.startedMessages,
     }))
@@ -232,201 +221,73 @@ function buildAdRows(rows: MetaInsightRow[]) {
     });
 }
 
-async function fetchMetaJson<T>(url: string) {
-  const response = await fetch(url, {
-    cache: "no-store",
-  });
-
-  const payload = (await response.json()) as T & { error?: { message?: string } };
-
-  if (!response.ok || payload.error) {
-    throw new Error(payload.error?.message || "Falha ao consultar a API da Meta.");
-  }
-
-  return payload;
-}
-
-async function findWhatsCampaigns(accessToken: string, adAccountId: string) {
-  let nextUrl =
-    `https://graph.facebook.com/${META_GRAPH_VERSION}/${adAccountId}/campaigns?` +
-    new URLSearchParams({
-      access_token: accessToken,
-      fields: "id,name",
-      limit: "100",
-    }).toString();
-
-  const campaigns: MetaCampaign[] = [];
-
-  while (nextUrl) {
-    const payload = await fetchMetaJson<MetaCampaignResponse>(nextUrl);
-    const matchingCampaigns =
-      payload.data?.filter((campaign) => campaign.name?.includes(MESSAGES_CAMPAIGN_TAG)) ?? [];
-
-    campaigns.push(...matchingCampaigns);
-    nextUrl = payload.paging?.next ?? "";
-  }
-
-  return campaigns;
-}
-
-async function fetchCampaignInsights(
-  accessToken: string,
-  campaign: MetaCampaign,
-  since: string,
-  until: string
-) {
-  const insightsUrl =
-    `https://graph.facebook.com/${META_GRAPH_VERSION}/${campaign.id}/insights?` +
-    new URLSearchParams({
-      access_token: accessToken,
-      fields: "campaign_id,campaign_name,spend,impressions,inline_link_clicks,actions",
-      level: "campaign",
-      time_increment: "all_days",
-      time_range: JSON.stringify({ since, until }),
-    }).toString();
-
-  const payload = await fetchMetaJson<MetaInsightResponse>(insightsUrl);
-  const row = payload.data?.[0];
-
-  if (!row) {
-    return null;
-  }
-
-  const amountSpent = parseNumber(row.spend);
-  const startedMessages = extractStartedMessages(row.actions);
-  const linkClicks = parseNumber(row.inline_link_clicks);
-  const impressions = parseNumber(row.impressions);
-
-  return {
-    amountSpent,
-    campaignId: row.campaign_id || campaign.id,
-    campaignName: row.campaign_name || campaign.name,
-    costPerLinkClick: linkClicks > 0 ? amountSpent / linkClicks : null,
-    costPerStartedMessage: startedMessages > 0 ? amountSpent / startedMessages : null,
-    impressions,
-    linkClicks,
-    linkCtr: impressions > 0 ? (linkClicks / impressions) * 100 : null,
-    startedMessages,
-  } satisfies FacebookMessagesCampaignRow;
-}
-
-async function fetchDailyMessagesInsights(
-  accessToken: string,
-  adAccountId: string,
-  since: string,
-  until: string
-) {
-  let nextUrl =
-    `https://graph.facebook.com/${META_GRAPH_VERSION}/${adAccountId}/insights?` +
-    new URLSearchParams({
-      access_token: accessToken,
-      fields: "campaign_id,campaign_name,date_start,spend,impressions,inline_link_clicks,actions",
-      level: "campaign",
-      time_increment: "1",
-      time_range: JSON.stringify({ since, until }),
-    }).toString();
-
-  const rows: MetaInsightRow[] = [];
-
-  while (nextUrl) {
-    const payload = await fetchMetaJson<MetaInsightResponse>(nextUrl);
-    const matchingRows =
-      payload.data?.filter((row) => row.campaign_name?.includes(MESSAGES_CAMPAIGN_TAG)) ?? [];
-
-    rows.push(...matchingRows);
-    nextUrl = payload.paging?.next ?? "";
-  }
-
-  return buildDailyRows(rows);
-}
-
-async function fetchAdMessagesInsights(
-  accessToken: string,
-  adAccountId: string,
-  since: string,
-  until: string
-) {
-  let nextUrl =
-    `https://graph.facebook.com/${META_GRAPH_VERSION}/${adAccountId}/insights?` +
-    new URLSearchParams({
-      access_token: accessToken,
-      fields: "ad_id,ad_name,campaign_id,campaign_name,spend,impressions,inline_link_clicks,actions",
-      level: "ad",
-      time_increment: "all_days",
-      time_range: JSON.stringify({ since, until }),
-    }).toString();
-
-  const rows: MetaInsightRow[] = [];
-
-  while (nextUrl) {
-    const payload = await fetchMetaJson<MetaInsightResponse>(nextUrl);
-    const matchingRows =
-      payload.data?.filter((row) => row.campaign_name?.includes(MESSAGES_CAMPAIGN_TAG)) ?? [];
-
-    rows.push(...matchingRows);
-    nextUrl = payload.paging?.next ?? "";
-  }
-
-  return buildAdRows(rows);
-}
-
 export async function getFacebookMessagesReport(
-  adAccountId: string
+  companyId: string,
+  adAccountId: string,
+  userId: string
 ): Promise<FacebookMessagesReportResult> {
-  const accessToken = process.env.FACEBOOK_ACCESS_TOKEN;
-  const lastCheckedAt = new Date().toISOString();
   const { since, until } = getReportDateRange("last_7_days");
   const campaignLabel = "Campanhas [WHATS] da conta";
 
-  if (!accessToken) {
+  try {
+    await ensureMetaInsightsReady(companyId, adAccountId, userId);
+  } catch (error) {
+    if (error instanceof MetaSyncNotConfiguredError) {
+      return {
+        adRows: [],
+        campaignLabel,
+        dailyRows: [],
+        lastCheckedAt: new Date().toISOString(),
+        message: error.message,
+        rows: [],
+        since,
+        state: "not_configured",
+        until,
+      };
+    }
+
     return {
       adRows: [],
       campaignLabel,
       dailyRows: [],
-      lastCheckedAt,
-      message: "Defina FACEBOOK_ACCESS_TOKEN para habilitar o relatório de Mensagens.",
+      lastCheckedAt: new Date().toISOString(),
+      message:
+        error instanceof Error
+          ? error.message
+          : "Não foi possível sincronizar os dados da Meta para o relatório de mensagens.",
       rows: [],
       since,
-      state: "not_configured",
+      state: "error",
       until,
     };
   }
 
   try {
-    const campaigns = await findWhatsCampaigns(accessToken, adAccountId);
+    const storedRows = await listStoredMetaInsights(companyId, adAccountId, since, until);
+    const messageRows = filterMessageRows(storedRows);
 
-    if (!campaigns.length) {
+    if (!messageRows.length) {
+      const hasMessageCampaigns = await hasStoredCampaignTag(companyId, adAccountId, MESSAGES_CAMPAIGN_TAG);
+
+      if (!hasMessageCampaigns) {
+        return {
+          adRows: [],
+          campaignLabel,
+          dailyRows: [],
+          lastCheckedAt: new Date().toISOString(),
+          message: "Não há campanha com [WHATS] na conta de anúncios selecionada.",
+          rows: [],
+          since,
+          state: "not_found",
+          until,
+        };
+      }
+
       return {
         adRows: [],
         campaignLabel,
         dailyRows: [],
-        lastCheckedAt,
-        message: "Não há campanha com [WHATS] na conta de anúncios selecionada.",
-        rows: [],
-        since,
-        state: "not_found",
-        until,
-      };
-    }
-
-    const [rows, dailyRows, adRows] = await Promise.all([
-      Promise.all(
-        campaigns.map((campaign) => fetchCampaignInsights(accessToken, campaign, since, until))
-      ),
-      fetchDailyMessagesInsights(accessToken, adAccountId, since, until),
-      fetchAdMessagesInsights(accessToken, adAccountId, since, until),
-    ]);
-
-    const campaignRows = rows
-      .filter((row): row is FacebookMessagesCampaignRow => Boolean(row))
-      .sort((left, right) => left.campaignName.localeCompare(right.campaignName, "pt-BR"));
-
-    if (!campaignRows.length) {
-      return {
-        adRows: [],
-        campaignLabel,
-        dailyRows: [],
-        lastCheckedAt,
+        lastCheckedAt: new Date().toISOString(),
         rows: [],
         since,
         state: "empty",
@@ -435,11 +296,11 @@ export async function getFacebookMessagesReport(
     }
 
     return {
-      adRows,
+      adRows: buildAdRows(messageRows),
       campaignLabel,
-      dailyRows,
-      lastCheckedAt,
-      rows: campaignRows,
+      dailyRows: buildDailyRows(messageRows),
+      lastCheckedAt: getLatestSyncedAt(messageRows),
+      rows: buildCampaignRows(messageRows),
       since,
       state: "ok",
       until,
@@ -449,11 +310,11 @@ export async function getFacebookMessagesReport(
       adRows: [],
       campaignLabel,
       dailyRows: [],
-      lastCheckedAt,
+      lastCheckedAt: new Date().toISOString(),
       message:
         error instanceof Error
           ? error.message
-          : "Não foi possível consultar a API da Meta para o relatório.",
+          : "Não foi possível carregar os dados persistidos da Meta para o relatório.",
       rows: [],
       since,
       state: "error",
@@ -461,6 +322,3 @@ export async function getFacebookMessagesReport(
     };
   }
 }
-
-
-

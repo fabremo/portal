@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import {
   BadgeCheck,
@@ -16,7 +16,9 @@ import { getCompanySettingsData } from "@/lib/dashboard/company-settings";
 
 import {
   createCompanyAction,
+  createCompanyAdAccountAction,
   createCompanyProductAction,
+  toggleCompanyAdAccountActiveAction,
   toggleCompanyProductActiveAction,
   updateCompanyAction,
   updateCompanyProductAction,
@@ -59,7 +61,7 @@ export default async function DashboardSettingsPage({ searchParams }: DashboardS
     redirect("/dashboard");
   }
 
-  const { companies, users } = await getCompanySettingsData();
+  const { availableAdAccounts, companies, users } = await getCompanySettingsData();
   const selectedCompanyId = resolvedSearchParams?.company;
   const selectedCompany = companies.find((company) => company.id === selectedCompanyId) ?? companies[0] ?? null;
   const selectedUserIds = new Set(selectedCompany?.memberships.map((membership) => membership.userId) ?? []);
@@ -361,6 +363,140 @@ export default async function DashboardSettingsPage({ searchParams }: DashboardS
               </div>
             )}
           </article>
+
+          {selectedCompany ? (
+            <article className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-card md:p-7">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-ink/45">Contas de anúncio</p>
+                  <h3 className="mt-2 text-2xl font-semibold text-ink">Fonte oficial das contas da empresa</h3>
+                  <p className="mt-2 max-w-3xl text-sm text-ink/68">
+                    Vincule aqui as contas de anúncio que pertencem a esta empresa. Os relatórios e a sincronização da Meta passam a usar esse vínculo como fonte oficial.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-black/5 bg-background px-4 py-3 text-sm text-ink/68">
+                  {selectedCompany.adAccounts.length} {selectedCompany.adAccounts.length === 1 ? "conta vinculada" : "contas vinculadas"}
+                </div>
+              </div>
+
+              <div className="mt-8 rounded-[1.5rem] border border-gray-200 bg-background/55 p-5 md:p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h4 className="text-lg font-semibold text-ink">Nova conta de anúncio</h4>
+                    <p className="mt-1 text-sm text-ink/65">
+                      Cada conta pode pertencer a apenas uma empresa. O nome exibido será preenchido a partir da base de contas do sistema.
+                    </p>
+                  </div>
+                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-accent">
+                    <BadgeCheck className="h-5 w-5" />
+                  </span>
+                </div>
+
+                <form action={createCompanyAdAccountAction} className="mt-6 grid gap-4 xl:grid-cols-[minmax(220px,1fr)_minmax(240px,1.4fr)_auto]">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-ink" htmlFor="new-ad-account-company">
+                      Empresa
+                    </label>
+                    <select
+                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-accent/45 focus:ring-2 focus:ring-accent/12"
+                      defaultValue={selectedCompany.id}
+                      id="new-ad-account-company"
+                      name="companyId"
+                    >
+                      {companies.map((company) => (
+                        <option key={company.id} value={company.id}>
+                          {company.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-ink" htmlFor="new-ad-account-id">
+                      Conta de anúncio
+                    </label>
+                    <select
+                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-accent/45 focus:ring-2 focus:ring-accent/12"
+                      id="new-ad-account-id"
+                      name="adAccountId"
+                    >
+                      <option value="">Selecione uma conta</option>
+                      {availableAdAccounts.map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.name}{account.isBound ? " (já vinculada)" : ""}{account.isActive ? "" : " - inativa"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col justify-end gap-3">
+                    <label className="inline-flex items-center gap-2 text-sm text-ink/72">
+                      <input defaultChecked name="isActive" type="checkbox" value="1" />
+                      Ativo
+                    </label>
+                    <button
+                      className="inline-flex items-center justify-center rounded-2xl bg-ink px-4 py-3 text-sm font-medium text-white transition hover:bg-ink/92"
+                      type="submit"
+                    >
+                      Vincular conta
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <div className="mt-8 space-y-4">
+                {selectedCompany.adAccounts.length ? (
+                  selectedCompany.adAccounts.map((binding) => (
+                    <div className="rounded-[1.5rem] border border-gray-200 bg-white p-5" key={binding.id}>
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="text-lg font-semibold text-ink">{binding.adAccountName}</h4>
+                            <span
+                              className={[
+                                "inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium",
+                                binding.isActive
+                                  ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                                  : "border border-gray-200 bg-gray-100 text-ink/62",
+                              ].join(" ")}
+                            >
+                              <ToggleLeft className="h-3.5 w-3.5" />
+                              {binding.isActive ? "Ativa" : "Inativa"}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm text-ink/62">ID da conta: {binding.adAccountId}</p>
+                          <p className="mt-1 text-sm text-ink/62">
+                            Criada em {formatDateTime(binding.createdAt)}. Última atualização em {formatDateTime(binding.updatedAt)}.
+                          </p>
+                        </div>
+
+                        <form action={toggleCompanyAdAccountActiveAction}>
+                          <input name="bindingId" type="hidden" value={binding.id} />
+                          <input name="companyId" type="hidden" value={selectedCompany.id} />
+                          <input name="nextIsActive" type="hidden" value={binding.isActive ? "false" : "true"} />
+                          <button
+                            className={[
+                              "inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-medium transition",
+                              binding.isActive
+                                ? "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                                : "border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+                            ].join(" ")}
+                            type="submit"
+                          >
+                            {binding.isActive ? "Desativar conta" : "Reativar conta"}
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-[1.4rem] border border-dashed border-gray-200 bg-background/55 px-4 py-10 text-center text-sm text-ink/58">
+                    Esta empresa ainda não possui contas de anúncio vinculadas.
+                  </div>
+                )}
+              </div>
+            </article>
+          ) : null}
 
           {selectedCompany ? (
             <article className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-card md:p-7">
