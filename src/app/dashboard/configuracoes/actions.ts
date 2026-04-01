@@ -9,9 +9,12 @@ import { createServiceRoleSupabaseClient } from "@/lib/supabase/service-role";
 const SETTINGS_PATH = "/dashboard/configuracoes";
 const UNIQUE_VIOLATION_ERROR_CODE = "23505";
 
+type SettingsSection = "ad-accounts" | "companies";
+
 type RedirectState = {
   companyId?: string;
   message: string;
+  section?: SettingsSection;
   status: "error" | "success";
 };
 
@@ -25,7 +28,7 @@ function normalizeCompanySlug(value: string) {
     .replace(/^-+|-+$/g, "");
 }
 
-function redirectToSettings({ companyId, message, status }: RedirectState): never {
+function redirectToSettings({ companyId, message, section = "companies", status }: RedirectState): never {
   const searchParams = new URLSearchParams();
 
   if (companyId) {
@@ -33,6 +36,7 @@ function redirectToSettings({ companyId, message, status }: RedirectState): neve
   }
 
   searchParams.set("message", message);
+  searchParams.set("section", section);
   searchParams.set("status", status);
 
   redirect(`${SETTINGS_PATH}?${searchParams.toString()}`);
@@ -136,17 +140,24 @@ async function ensureUniqueHotmartProductId(hotmartProductId: number, currentPro
 
 async function ensureAdAccountExists(adAccountId: string) {
   const supabase = await ensureServiceRoleClient();
-  const { data, error } = await supabase
-    .from("ad_accounts")
-    .select("id, name")
-    .eq("id", adAccountId)
-    .maybeSingle();
+  const { data, error } = await supabase.from("ad_accounts").select("id, name").eq("id", adAccountId).maybeSingle();
 
   if (error) {
     throw new Error("Não foi possível validar a conta de anúncios selecionada.");
   }
 
   return data as { id: string; name: string | null } | null;
+}
+
+async function ensureUniqueAdAccountId(adAccountId: string) {
+  const supabase = await ensureServiceRoleClient();
+  const { data, error } = await supabase.from("ad_accounts").select("id").eq("id", adAccountId).maybeSingle();
+
+  if (error) {
+    throw new Error("Não foi possível validar o ID da conta de anúncios.");
+  }
+
+  return !data;
 }
 
 async function ensureUniqueCompanyAdAccount(adAccountId: string, currentBindingId?: string) {
@@ -356,7 +367,6 @@ export async function createCompanyProductAction(formData: FormData) {
 
   const companyId = getTrimmedString(formData, "companyId");
   const productName = getTrimmedString(formData, "productName");
-  const hotmartProductUcode = getTrimmedString(formData, "hotmartProductUcode") || null;
   const hotmartProductId = parseRequiredHotmartProductId(getTrimmedString(formData, "hotmartProductId"));
   const isActive = isChecked(formData, "isActive");
 
@@ -406,7 +416,6 @@ export async function createCompanyProductAction(formData: FormData) {
   const { error } = await supabase.from("company_products").insert({
     company_id: companyId,
     hotmart_product_id: hotmartProductId,
-    hotmart_product_ucode: hotmartProductUcode,
     is_active: isActive,
     product_name: productName,
   });
@@ -441,7 +450,6 @@ export async function updateCompanyProductAction(formData: FormData) {
   const productId = getTrimmedString(formData, "productId");
   const companyId = getTrimmedString(formData, "companyId");
   const productName = getTrimmedString(formData, "productName");
-  const hotmartProductUcode = getTrimmedString(formData, "hotmartProductUcode") || null;
   const hotmartProductId = parseRequiredHotmartProductId(getTrimmedString(formData, "hotmartProductId"));
   const isActive = isChecked(formData, "isActive");
 
@@ -501,7 +509,6 @@ export async function updateCompanyProductAction(formData: FormData) {
     .update({
       company_id: companyId,
       hotmart_product_id: hotmartProductId,
-      hotmart_product_ucode: hotmartProductUcode,
       is_active: isActive,
       product_name: productName,
       updated_at: new Date().toISOString(),
@@ -695,6 +702,105 @@ export async function toggleCompanyAdAccountActiveAction(formData: FormData) {
     message: nextIsActive
       ? "Conta de anúncios reativada com sucesso."
       : "Conta de anúncios desativada com sucesso.",
+    status: "success",
+  });
+}
+
+export async function createAdAccountAction(formData: FormData) {
+  await ensureAdminAccess();
+
+  const adAccountId = getTrimmedString(formData, "adAccountId");
+  const adAccountName = getTrimmedString(formData, "adAccountName");
+  const isActive = isChecked(formData, "isActive");
+
+  if (!adAccountId) {
+    redirectToSettings({
+      message: "Informe o ID da conta de anúncios antes de salvar.",
+      section: "ad-accounts",
+      status: "error",
+    });
+  }
+
+  if (!adAccountName) {
+    redirectToSettings({
+      message: "Informe o nome da conta de anúncios antes de salvar.",
+      section: "ad-accounts",
+      status: "error",
+    });
+  }
+
+  const isUniqueAdAccountId = await ensureUniqueAdAccountId(adAccountId);
+
+  if (!isUniqueAdAccountId) {
+    redirectToSettings({
+      message: "Este ID de conta de anúncios já está cadastrado.",
+      section: "ad-accounts",
+      status: "error",
+    });
+  }
+
+  const supabase = await ensureServiceRoleClient();
+  const { error } = await supabase.from("ad_accounts").insert({
+    id: adAccountId,
+    is_active: isActive,
+    name: adAccountName,
+  });
+
+  if (error?.code === UNIQUE_VIOLATION_ERROR_CODE) {
+    redirectToSettings({
+      message: "Este ID de conta de anúncios já está cadastrado.",
+      section: "ad-accounts",
+      status: "error",
+    });
+  }
+
+  if (error) {
+    redirectToSettings({
+      message: "Não foi possível cadastrar a conta de anúncios.",
+      section: "ad-accounts",
+      status: "error",
+    });
+  }
+
+  revalidatePath(SETTINGS_PATH);
+  redirectToSettings({
+    message: "Conta de anúncios cadastrada com sucesso.",
+    section: "ad-accounts",
+    status: "success",
+  });
+}
+
+export async function toggleAdAccountActiveAction(formData: FormData) {
+  await ensureAdminAccess();
+
+  const adAccountId = getTrimmedString(formData, "adAccountId");
+  const nextIsActive = getTrimmedString(formData, "nextIsActive") === "true";
+
+  if (!adAccountId) {
+    redirectToSettings({
+      message: "Selecione uma conta de anúncios válida antes de alterar o status.",
+      section: "ad-accounts",
+      status: "error",
+    });
+  }
+
+  const supabase = await ensureServiceRoleClient();
+  const { error } = await supabase.from("ad_accounts").update({ is_active: nextIsActive }).eq("id", adAccountId);
+
+  if (error) {
+    redirectToSettings({
+      message: "Não foi possível atualizar o status da conta de anúncios.",
+      section: "ad-accounts",
+      status: "error",
+    });
+  }
+
+  revalidatePath(SETTINGS_PATH);
+  redirectToSettings({
+    message: nextIsActive
+      ? "Conta de anúncios reativada com sucesso."
+      : "Conta de anúncios desativada com sucesso.",
+    section: "ad-accounts",
     status: "success",
   });
 }

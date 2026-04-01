@@ -16,13 +16,10 @@ type CompanyMembershipRow = {
 
 type CompanyProductRow = {
   company_id: string;
-  created_at: string;
   hotmart_product_id: number;
-  hotmart_product_ucode: string | null;
   id: string;
   is_active: boolean;
   product_name: string;
-  updated_at: string;
 };
 
 type CompanyAdAccountBindingRow = {
@@ -62,13 +59,10 @@ export type CompanySettingsUser = {
 
 export type CompanySettingsProduct = {
   companyId: string;
-  createdAt: string;
   hotmartProductId: number;
-  hotmartProductUcode: string | null;
   id: string;
   isActive: boolean;
   productName: string;
-  updatedAt: string;
 };
 
 export type CompanySettingsAdAccountBinding = {
@@ -82,6 +76,8 @@ export type CompanySettingsAdAccountBinding = {
 };
 
 export type CompanySettingsAvailableAdAccount = {
+  boundCompanyId: string | null;
+  boundCompanyName: string | null;
   id: string;
   isActive: boolean;
   isBound: boolean;
@@ -161,9 +157,7 @@ export async function getCompanySettingsData(): Promise<CompanySettingsData> {
     supabase.from("user_companies").select("company_id, user_id"),
     supabase
       .from("company_products")
-      .select(
-        "id, company_id, hotmart_product_id, hotmart_product_ucode, product_name, is_active, created_at, updated_at"
-      )
+      .select("id, company_id, hotmart_product_id, product_name, is_active")
       .order("product_name", { ascending: true }),
     supabase
       .from("company_ad_accounts")
@@ -198,6 +192,9 @@ export async function getCompanySettingsData(): Promise<CompanySettingsData> {
     throw new Error("Não foi possível carregar os perfis de usuário.");
   }
 
+  const companiesRows = (companiesResponse.data ?? []) as CompanyRow[];
+  const companiesById = new Map(companiesRows.map((company) => [company.id, company]));
+
   const profileIds = new Set(((profilesResponse.data ?? []) as ProfileRow[]).map((profile) => profile.id));
   const users = authUsers
     .filter((user) => profileIds.has(user.id))
@@ -228,13 +225,10 @@ export async function getCompanySettingsData(): Promise<CompanySettingsData> {
 
     companyProducts.push({
       companyId: product.company_id,
-      createdAt: product.created_at,
       hotmartProductId: product.hotmart_product_id,
-      hotmartProductUcode: product.hotmart_product_ucode,
       id: product.id,
       isActive: product.is_active,
       productName: product.product_name,
-      updatedAt: product.updated_at,
     });
 
     productsByCompanyId.set(product.company_id, companyProducts);
@@ -242,6 +236,7 @@ export async function getCompanySettingsData(): Promise<CompanySettingsData> {
 
   const adAccountsByCompanyId = new Map<string, CompanySettingsAdAccountBinding[]>();
   const boundAccountIds = new Set<string>();
+  const boundCompanyByAccountId = new Map<string, { id: string; name: string }>();
 
   for (const binding of (companyAdAccountsResponse.data ?? []) as CompanyAdAccountBindingRow[]) {
     const companyBindings = adAccountsByCompanyId.get(binding.company_id) ?? [];
@@ -258,18 +253,38 @@ export async function getCompanySettingsData(): Promise<CompanySettingsData> {
 
     adAccountsByCompanyId.set(binding.company_id, companyBindings);
     boundAccountIds.add(binding.ad_account_id);
+
+    const company = companiesById.get(binding.company_id);
+    if (company) {
+      boundCompanyByAccountId.set(binding.ad_account_id, {
+        id: company.id,
+        name: company.name,
+      });
+    }
   }
 
   const availableAdAccounts = ((adAccountsResponse.data ?? []) as AdAccountRow[])
-    .map((account) => ({
-      id: account.id,
-      isActive: account.is_active,
-      isBound: boundAccountIds.has(account.id),
-      name: account.name || "Conta sem nome",
-    }))
-    .sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
+    .map((account) => {
+      const boundCompany = boundCompanyByAccountId.get(account.id);
 
-  const companies = ((companiesResponse.data ?? []) as CompanyRow[])
+      return {
+        boundCompanyId: boundCompany?.id ?? null,
+        boundCompanyName: boundCompany?.name ?? null,
+        id: account.id,
+        isActive: account.is_active,
+        isBound: boundAccountIds.has(account.id),
+        name: account.name || "Conta sem nome",
+      };
+    })
+    .sort((left, right) => {
+      if (left.isActive !== right.isActive) {
+        return left.isActive ? -1 : 1;
+      }
+
+      return left.name.localeCompare(right.name, "pt-BR");
+    });
+
+  const companies = companiesRows
     .map((company) => {
       const memberships = (membershipsByCompanyId.get(company.id) ?? []).sort((left, right) =>
         left.email.localeCompare(right.email, "pt-BR")
