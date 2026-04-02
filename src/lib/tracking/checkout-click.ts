@@ -163,7 +163,13 @@ export async function insertCheckoutClickTracking(insertData: CheckoutClickTrack
     throw new Error("Configuração do Supabase incompleta.");
   }
 
-  const { error } = await supabase.from("checkout_click_tracking").insert(insertData);
+  const query = insertData.xcod
+    ? supabase.from("checkout_click_tracking").upsert(insertData, {
+        onConflict: "company_id,xcod",
+      })
+    : supabase.from("checkout_click_tracking").insert(insertData);
+
+  const { error } = await query;
 
   if (error) {
     throw new Error("Não foi possível registrar o tracking de checkout.");

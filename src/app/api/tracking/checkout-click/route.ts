@@ -75,5 +75,5 @@ export async function POST(request: Request) {
     return jsonResponse({ message: "Erro ao registrar tracking." }, 500);
   }
 
-  return jsonResponse({ ok: true }, 201);
+  return jsonResponse({ ok: true }, 200);
 }
