@@ -20,6 +20,7 @@ export type AccessibleCompany = {
   id: string;
   name: string;
   slug: string;
+  trackingEnabled: boolean;
 };
 
 export type DashboardAccessContext = {
@@ -30,6 +31,7 @@ export type DashboardAccessContext = {
   activeAdAccount: AccessibleAdAccount | null;
   activeCompany: AccessibleCompany | null;
   activeCompanyId: string | null;
+  canAccessTrackingModule: boolean;
   isAdmin: boolean;
   role: UserRole;
   userEmail: string;
@@ -56,6 +58,7 @@ type CompanyRow = {
   id: string;
   name: string;
   slug: string;
+  tracking_enabled: boolean | null;
 };
 
 type UserCompanyRow = {
@@ -73,6 +76,16 @@ export function canAccessBuyersModule(
   accessContext: Pick<DashboardAccessContext, "accessibleCompanyIds" | "isAdmin">
 ) {
   return accessContext.isAdmin || accessContext.accessibleCompanyIds.length > 0;
+}
+
+export function canAccessTrackingModule(
+  accessContext: Pick<DashboardAccessContext, "activeCompany" | "accessibleCompanyIds" | "isAdmin">
+) {
+  if (!accessContext.isAdmin && !accessContext.accessibleCompanyIds.length) {
+    return false;
+  }
+
+  return Boolean(accessContext.activeCompany?.trackingEnabled);
 }
 
 function resolveActiveAdAccount(accessibleAccounts: AccessibleAdAccount[], cookieAccountId?: string) {
@@ -193,7 +206,7 @@ async function resolveAccessibleCompanies(isAdmin: boolean, userId: string) {
   if (isAdmin) {
     const { data, error } = await supabase
       .from("companies")
-      .select("id, name, slug")
+      .select("id, name, slug, tracking_enabled")
       .order("name", { ascending: true });
 
     if (error) {
@@ -204,6 +217,7 @@ async function resolveAccessibleCompanies(isAdmin: boolean, userId: string) {
       id: company.id,
       name: company.name,
       slug: company.slug,
+      trackingEnabled: Boolean(company.tracking_enabled),
     }));
   }
 
@@ -214,7 +228,8 @@ async function resolveAccessibleCompanies(isAdmin: boolean, userId: string) {
       companies!inner (
         id,
         name,
-        slug
+        slug,
+        tracking_enabled
       )
     `
     )
@@ -231,6 +246,7 @@ async function resolveAccessibleCompanies(isAdmin: boolean, userId: string) {
       id: company.id,
       name: company.name,
       slug: company.slug,
+      trackingEnabled: Boolean(company.tracking_enabled),
     }));
 
   const uniqueCompanies = Array.from(new Map(companies.map((company) => [company.id, company])).values());
@@ -316,11 +332,10 @@ export const getDashboardAccessContext = cache(async (): Promise<DashboardAccess
   const cookieStore = await cookies();
   const cookieAccountId = cookieStore.get(ACTIVE_AD_ACCOUNT_COOKIE_NAME)?.value;
   const cookieCompanyId = cookieStore.get(ACTIVE_COMPANY_COOKIE_NAME)?.value;
+  const accessibleCompanyIds = accessibleCompanies.map((company) => company.id);
 
   if (isAdmin) {
-    const companyBindings = await resolveCompanyAdAccountBindings(
-      accessibleCompanies.map((company) => company.id)
-    );
+    const companyBindings = await resolveCompanyAdAccountBindings(accessibleCompanyIds);
     const companyIdsWithAccounts = Array.from(new Set(companyBindings.map((binding) => binding.company_id)));
     const activeCompany = resolveActiveCompany(accessibleCompanies, cookieCompanyId, companyIdsWithAccounts);
     const accessibleAccounts = activeCompany
@@ -332,13 +347,18 @@ export const getDashboardAccessContext = cache(async (): Promise<DashboardAccess
     return {
       accessibleAccounts,
       accessibleCompanies,
-      accessibleCompanyIds: accessibleCompanies.map((company) => company.id),
+      accessibleCompanyIds,
       accountCompanyIds: Object.fromEntries(
         accessibleAccounts.map((account) => [account.id, activeCompanyId ?? ""])
       ),
       activeAdAccount,
       activeCompany,
       activeCompanyId,
+      canAccessTrackingModule: canAccessTrackingModule({
+        activeCompany,
+        accessibleCompanyIds,
+        isAdmin,
+      }),
       isAdmin,
       role,
       userEmail: user.email || "usuario@empresa.com",
@@ -348,7 +368,7 @@ export const getDashboardAccessContext = cache(async (): Promise<DashboardAccess
 
   const rawAccessibleAccounts = mapUserAdAccountRows((accountResult?.data ?? []) as UserAdAccountRow[]);
   const companyAccountBindings = await resolveCompanyAdAccountBindings(
-    accessibleCompanies.map((company) => company.id),
+    accessibleCompanyIds,
     rawAccessibleAccounts.map((account) => account.id)
   );
   const companyByAccountId = new Map(
@@ -373,11 +393,16 @@ export const getDashboardAccessContext = cache(async (): Promise<DashboardAccess
   return {
     accessibleAccounts,
     accessibleCompanies,
-    accessibleCompanyIds: accessibleCompanies.map((company) => company.id),
+    accessibleCompanyIds,
     accountCompanyIds: Object.fromEntries(companyByAccountId.entries()),
     activeAdAccount,
     activeCompany,
     activeCompanyId,
+    canAccessTrackingModule: canAccessTrackingModule({
+      activeCompany,
+      accessibleCompanyIds,
+      isAdmin,
+    }),
     isAdmin,
     role,
     userEmail: user.email || "usuario@empresa.com",

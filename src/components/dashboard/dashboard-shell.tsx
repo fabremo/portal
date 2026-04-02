@@ -15,6 +15,7 @@ type AccessibleCompany = {
   id: string;
   name: string;
   slug: string;
+  trackingEnabled: boolean;
 };
 
 type DashboardShellProps = {
@@ -23,6 +24,7 @@ type DashboardShellProps = {
   activeAdAccount: AccessibleAdAccount | null;
   activeCompany: AccessibleCompany | null;
   canAccessBuyersModule: boolean;
+  canAccessTrackingModule: boolean;
   children: ReactNode;
   isAdmin: boolean;
   userEmail: string;
@@ -63,6 +65,7 @@ export function DashboardShell({
   activeAdAccount,
   activeCompany,
   canAccessBuyersModule,
+  canAccessTrackingModule,
   children,
   isAdmin,
   userEmail,
@@ -88,6 +91,7 @@ export function DashboardShell({
         activeAdAccount={activeAdAccount}
         activeCompany={activeCompany}
         canAccessBuyersModule={canAccessBuyersModule}
+        canAccessTrackingModule={canAccessTrackingModule}
         isAdmin={isAdmin}
         isCollapsed={isCollapsed}
         onToggleCollapse={handleToggleCollapse}

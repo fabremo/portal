@@ -263,7 +263,6 @@ export async function updateCompanyAction(formData: FormData) {
   const name = getTrimmedString(formData, "name");
   const rawSlug = getTrimmedString(formData, "slug");
   const slug = normalizeCompanySlug(rawSlug);
-  const trackingEnabled = isChecked(formData, "trackingEnabled");
   const requestedUserIds = getSelectedUserIds(formData);
 
   if (!companyId) {
@@ -302,7 +301,7 @@ export async function updateCompanyAction(formData: FormData) {
   const userIds = await validateSelectedUsers(requestedUserIds);
   const supabase = await ensureServiceRoleClient();
 
-  const { error: updateError } = await supabase.from("companies").update({ name, slug, tracking_enabled: trackingEnabled }).eq("id", companyId);
+  const { error: updateError } = await supabase.from("companies").update({ name, slug }).eq("id", companyId);
 
   if (updateError?.code === UNIQUE_VIOLATION_ERROR_CODE) {
     redirectToSettings({

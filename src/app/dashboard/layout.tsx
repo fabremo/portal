@@ -26,6 +26,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
           activeAdAccount={accessContext.activeAdAccount}
           activeCompany={accessContext.activeCompany}
           canAccessBuyersModule={canAccessBuyersModule(accessContext)}
+          canAccessTrackingModule={accessContext.canAccessTrackingModule}
           isAdmin={accessContext.isAdmin}
           userEmail={accessContext.userEmail}
         >

@@ -7,6 +7,7 @@ type CompanyRow = {
   id: string;
   name: string;
   slug: string;
+  tracking_enabled: boolean | null;
 };
 
 type CompanyMembershipRow = {
@@ -95,6 +96,7 @@ export type CompanySettingsCompany = {
   name: string;
   products: CompanySettingsProduct[];
   slug: string;
+  trackingEnabled: boolean;
 };
 
 export type CompanySettingsData = {
@@ -153,7 +155,7 @@ export async function getCompanySettingsData(): Promise<CompanySettingsData> {
     profilesResponse,
     authUsers,
   ] = await Promise.all([
-    supabase.from("companies").select("id, name, slug, created_at").order("name", { ascending: true }),
+    supabase.from("companies").select("id, name, slug, tracking_enabled, created_at").order("name", { ascending: true }),
     supabase.from("user_companies").select("company_id, user_id"),
     supabase
       .from("company_products")
@@ -315,6 +317,7 @@ export async function getCompanySettingsData(): Promise<CompanySettingsData> {
         name: company.name,
         products,
         slug: company.slug,
+        trackingEnabled: Boolean(company.tracking_enabled),
       };
     })
     .sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));

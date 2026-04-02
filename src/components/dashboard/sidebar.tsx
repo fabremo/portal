@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ContactRound,
+  Crosshair,
   FileText,
   MessageSquareText,
   PanelLeft,
@@ -32,6 +33,7 @@ type AccessibleCompany = {
   id: string;
   name: string;
   slug: string;
+  trackingEnabled: boolean;
 };
 
 type DashboardSidebarProps = {
@@ -40,6 +42,7 @@ type DashboardSidebarProps = {
   activeAdAccount: AccessibleAdAccount | null;
   activeCompany: AccessibleCompany | null;
   canAccessBuyersModule: boolean;
+  canAccessTrackingModule: boolean;
   isAdmin: boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
@@ -104,6 +107,10 @@ function getLinkIcon(href: string, label: string) {
 
   if (href.startsWith("/dashboard/compradores")) {
     return <ShoppingCart className="h-4 w-4 shrink-0" />;
+  }
+
+  if (href.startsWith("/dashboard/tracking")) {
+    return <Crosshair className="h-4 w-4 shrink-0" />;
   }
 
   if (href.startsWith("/dashboard/relatorios")) {
@@ -197,6 +204,7 @@ export function DashboardSidebar({
   activeAdAccount,
   activeCompany,
   canAccessBuyersModule,
+  canAccessTrackingModule,
   isAdmin,
   isCollapsed,
   onToggleCollapse,
@@ -206,6 +214,7 @@ export function DashboardSidebar({
   const isOverviewActive = pathname === "/dashboard";
   const isReportsRoute = pathname.startsWith("/dashboard/relatorios");
   const isBuyersModuleRoute = pathname.startsWith("/dashboard/compradores");
+  const isTrackingRoute = pathname.startsWith("/dashboard/tracking");
   const isSettingsActive = pathname === "/dashboard/configuracoes";
   const [isReportsExpanded, setIsReportsExpanded] = useState(isReportsRoute);
   const [isBuyersExpanded, setIsBuyersExpanded] = useState(isBuyersModuleRoute);
@@ -387,6 +396,18 @@ export function DashboardSidebar({
                 ))}
               </div>
             ) : null}
+          </div>
+        ) : null}
+
+        {canAccessTrackingModule ? (
+          <div className={isCollapsed ? "w-full" : undefined}>
+            {renderNavLink({
+              href: "/dashboard/tracking",
+              icon: getLinkIcon("/dashboard/tracking", "Tracking"),
+              isActive: isTrackingRoute,
+              isCollapsed,
+              label: "Tracking",
+            })}
           </div>
         ) : null}
 

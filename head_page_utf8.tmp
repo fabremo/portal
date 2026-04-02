@@ -1,9 +1,8 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import {
   Building2,
   CheckCircle2,
-  Crosshair,
   Database,
   Link2,
   Package,
@@ -220,7 +219,6 @@ export default async function DashboardSettingsPage({ searchParams }: DashboardS
                         <div className="mt-3 flex flex-wrap gap-2 text-xs text-ink/58">
                           <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1"><Package className="h-3.5 w-3.5" />{company.products.length} {company.products.length === 1 ? "produto" : "produtos"}</span>
                           <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1"><Link2 className="h-3.5 w-3.5" />{company.adAccounts.length} {company.adAccounts.length === 1 ? "conta" : "contas"}</span>
-                          <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1"><Crosshair className="h-3.5 w-3.5" />{company.trackingEnabled ? "Tracking ativo" : "Tracking desabilitado"}</span>
                         </div>
                       </a>
                     );
@@ -249,7 +247,6 @@ export default async function DashboardSettingsPage({ searchParams }: DashboardS
                     <span className="inline-flex items-center gap-2 rounded-full bg-background px-3 py-1.5"><Users className="h-3.5 w-3.5 text-accent" />{selectedCompany.memberCount} {selectedCompany.memberCount === 1 ? "usuário" : "usuários"}</span>
                     <span className="inline-flex items-center gap-2 rounded-full bg-background px-3 py-1.5"><Link2 className="h-3.5 w-3.5 text-accent" />{selectedCompany.activeAdAccountCount} contas ativas</span>
                     <span className="inline-flex items-center gap-2 rounded-full bg-background px-3 py-1.5"><Package className="h-3.5 w-3.5 text-accent" />{selectedCompany.activeProductCount} produtos ativos</span>
-                    <span className="inline-flex items-center gap-2 rounded-full bg-background px-3 py-1.5"><Crosshair className="h-3.5 w-3.5 text-accent" />{selectedCompany.trackingEnabled ? "Tracking habilitado" : "Tracking desabilitado"}</span>
                   </div>
                 </article>
 
@@ -276,14 +273,6 @@ export default async function DashboardSettingsPage({ searchParams }: DashboardS
                       </div>
                     </div>
 
-                    <label className="flex items-start gap-3 rounded-[1.4rem] border border-gray-200 bg-background/55 px-4 py-4 text-sm text-ink transition hover:border-accent/25">
-                      <input className="mt-1 h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent" defaultChecked={selectedCompany.trackingEnabled} name="trackingEnabled" type="checkbox" value="1" />
-                      <span>
-                        <span className="block font-medium text-ink">Habilitar tracking</span>
-                        <span className="mt-1 block text-ink/62">Libera o endpoint público de tracking para esta empresa e exibe o módulo na navegação quando esta empresa estiver ativa.</span>
-                      </span>
-                    </label>
-
                     <div className="flex justify-end border-t border-gray-100 pt-6">
                       <button className="inline-flex items-center justify-center rounded-2xl bg-accent px-5 py-3 text-sm font-medium text-white transition hover:bg-accent/92" type="submit">Salvar empresa</button>
                     </div>
@@ -304,7 +293,6 @@ export default async function DashboardSettingsPage({ searchParams }: DashboardS
                     <input name="companyId" type="hidden" value={selectedCompany.id} />
                     <input name="name" type="hidden" value={selectedCompany.name} />
                     <input name="slug" type="hidden" value={selectedCompany.slug} />
-                    <input name="trackingEnabled" type="hidden" value={selectedCompany.trackingEnabled ? "1" : "0"} />
 
                     {users.length ? (
                       <div className="grid max-h-[28rem] gap-3 overflow-y-auto rounded-[1.4rem] border border-gray-200 bg-background/60 p-4 md:grid-cols-2">
