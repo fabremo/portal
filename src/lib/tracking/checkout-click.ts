@@ -172,7 +172,9 @@ export async function insertCheckoutClickTracking(insertData: CheckoutClickTrack
   const { error } = await query;
 
   if (error) {
-    throw new Error("Não foi possível registrar o tracking de checkout.");
+    throw new Error(
+      `Não foi possível registrar o tracking de checkout. code=${error.code ?? "unknown"} message=${error.message}`
+    );
   }
 }
 

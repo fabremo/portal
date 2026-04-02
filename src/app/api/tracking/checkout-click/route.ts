@@ -20,6 +20,13 @@ function jsonResponse(body: Record<string, unknown>, status: number) {
   });
 }
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
+}
 async function parsePayload(request: Request) {
   try {
     return (await request.json()) as CheckoutClickTrackingPayload;
@@ -55,7 +62,12 @@ export async function POST(request: Request) {
 
   try {
     company = await resolveTrackingCompanyBySlug(companySlug);
-  } catch {
+  } catch (error) {
+    console.error("[tracking.checkout-click] company lookup failed", {
+      companySlug,
+      error: getErrorMessage(error),
+    });
+
     return jsonResponse({ message: "Erro ao localizar a empresa do tracking." }, 500);
   }
 
@@ -71,7 +83,14 @@ export async function POST(request: Request) {
     await insertCheckoutClickTracking(
       buildCheckoutClickTrackingInsert(payload, company.companyId, request.headers.get("user-agent"))
     );
-  } catch {
+  } catch (error) {
+    console.error("[tracking.checkout-click] insert failed", {
+      companyId: company.companyId,
+      companySlug,
+      xcod: payload.xcod ?? null,
+      error: getErrorMessage(error),
+    });
+
     return jsonResponse({ message: "Erro ao registrar tracking." }, 500);
   }
 
