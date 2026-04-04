@@ -40,10 +40,25 @@ export type FacebookSalesAdRow = {
   roas: number | null;
 };
 
+export type FacebookSalesFunnelSummary = {
+  checkouts: number;
+  connectRate: number | null;
+  costPerCheckout: number | null;
+  costPerLinkClick: number | null;
+  costPerPurchase: number | null;
+  cpm: number | null;
+  impressions: number;
+  landingPageViews: number;
+  linkClicks: number;
+  linkCtr: number | null;
+  purchases: number;
+};
+
 export type FacebookSalesReportResult =
   | {
       adRows: [];
       dailyRows: [];
+      funnelSummary: null;
       lastCheckedAt: string;
       message: string;
       rows: [];
@@ -54,6 +69,7 @@ export type FacebookSalesReportResult =
   | {
       adRows: FacebookSalesAdRow[];
       dailyRows: FacebookSalesDailyRow[];
+      funnelSummary: FacebookSalesFunnelSummary | null;
       lastCheckedAt: string;
       rows: FacebookSalesRow[];
       since: string;
@@ -82,6 +98,10 @@ export type FacebookSalesOverviewSummary =
 
 function calculateRoas(amountSpent: number, purchaseValue: number) {
   return amountSpent > 0 ? purchaseValue / amountSpent : null;
+}
+
+function divideOrNull(numerator: number, denominator: number) {
+  return denominator > 0 ? numerator / denominator : null;
 }
 
 function getLatestSyncedAt(rows: StoredInsightRow[]) {
@@ -198,9 +218,9 @@ function buildAdRows(rows: StoredInsightRow[]) {
     .map((row) => ({
       adName: row.adName,
       amountSpent: row.amountSpent,
-      costPerLinkClick: row.linkClicks > 0 ? row.amountSpent / row.linkClicks : null,
-      costPerPurchase: row.purchases > 0 ? row.amountSpent / row.purchases : null,
-      linkCtr: row.impressions > 0 ? (row.linkClicks / row.impressions) * 100 : null,
+      costPerLinkClick: divideOrNull(row.amountSpent, row.linkClicks),
+      costPerPurchase: divideOrNull(row.amountSpent, row.purchases),
+      linkCtr: divideOrNull(row.linkClicks * 100, row.impressions),
       purchaseValue: row.purchaseValue,
       purchases: row.purchases,
       roas: calculateRoas(row.amountSpent, row.purchaseValue),
@@ -218,6 +238,42 @@ function buildAdRows(rows: StoredInsightRow[]) {
     });
 }
 
+function buildFunnelSummary(rows: StoredInsightRow[]): FacebookSalesFunnelSummary {
+  const totals = rows.reduce(
+    (summary, row) => {
+      summary.amountSpent += row.spend;
+      summary.checkouts += row.checkouts;
+      summary.impressions += row.impressions;
+      summary.landingPageViews += row.landing_page_views;
+      summary.linkClicks += row.inline_link_clicks;
+      summary.purchases += row.purchases;
+      return summary;
+    },
+    {
+      amountSpent: 0,
+      checkouts: 0,
+      impressions: 0,
+      landingPageViews: 0,
+      linkClicks: 0,
+      purchases: 0,
+    }
+  );
+
+  return {
+    checkouts: totals.checkouts,
+    connectRate: divideOrNull(totals.landingPageViews * 100, totals.linkClicks),
+    costPerCheckout: divideOrNull(totals.amountSpent, totals.checkouts),
+    costPerLinkClick: divideOrNull(totals.amountSpent, totals.linkClicks),
+    costPerPurchase: divideOrNull(totals.amountSpent, totals.purchases),
+    cpm: divideOrNull(totals.amountSpent * 1000, totals.impressions),
+    impressions: totals.impressions,
+    landingPageViews: totals.landingPageViews,
+    linkClicks: totals.linkClicks,
+    linkCtr: divideOrNull(totals.linkClicks * 100, totals.impressions),
+    purchases: totals.purchases,
+  };
+}
+
 export async function getFacebookSalesReport(
   companyId: string,
   adAccountId: string,
@@ -233,6 +289,7 @@ export async function getFacebookSalesReport(
       return {
         adRows: [],
         dailyRows: [],
+        funnelSummary: null,
         lastCheckedAt: new Date().toISOString(),
         message: error.message,
         rows: [],
@@ -245,6 +302,7 @@ export async function getFacebookSalesReport(
     return {
       adRows: [],
       dailyRows: [],
+      funnelSummary: null,
       lastCheckedAt: new Date().toISOString(),
       message:
         error instanceof Error
@@ -268,6 +326,7 @@ export async function getFacebookSalesReport(
         return {
           adRows: [],
           dailyRows: [],
+          funnelSummary: null,
           lastCheckedAt: new Date().toISOString(),
           message: "Não há campanha com [VENDAS] na conta de anúncios selecionada.",
           rows: [],
@@ -280,6 +339,7 @@ export async function getFacebookSalesReport(
       return {
         adRows: [],
         dailyRows: [],
+        funnelSummary: null,
         lastCheckedAt: new Date().toISOString(),
         rows: [],
         since,
@@ -291,6 +351,7 @@ export async function getFacebookSalesReport(
     return {
       adRows: buildAdRows(salesRows),
       dailyRows: buildDailyRows(salesRows),
+      funnelSummary: buildFunnelSummary(salesRows),
       lastCheckedAt: getLatestSyncedAt(salesRows),
       rows: buildCampaignRows(salesRows),
       since,
@@ -301,6 +362,7 @@ export async function getFacebookSalesReport(
     return {
       adRows: [],
       dailyRows: [],
+      funnelSummary: null,
       lastCheckedAt: new Date().toISOString(),
       message:
         error instanceof Error

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   createContext,
@@ -40,10 +40,25 @@ type SalesAdRow = {
   roas: number | null;
 };
 
+type SalesFunnelSummary = {
+  checkouts: number;
+  connectRate: number | null;
+  costPerCheckout: number | null;
+  costPerLinkClick: number | null;
+  costPerPurchase: number | null;
+  cpm: number | null;
+  impressions: number;
+  landingPageViews: number;
+  linkClicks: number;
+  linkCtr: number | null;
+  purchases: number;
+};
+
 export type ClientSalesReportResult =
   | {
       adRows: [];
       dailyRows: [];
+      funnelSummary: null;
       lastCheckedAt: string;
       message: string;
       rows: [];
@@ -54,6 +69,7 @@ export type ClientSalesReportResult =
   | {
       adRows: SalesAdRow[];
       dailyRows: SalesDailyRow[];
+      funnelSummary: SalesFunnelSummary | null;
       lastCheckedAt: string;
       rows: SalesRow[];
       since: string;

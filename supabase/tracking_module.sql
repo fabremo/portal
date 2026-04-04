@@ -42,6 +42,7 @@ create index if not exists idx_checkout_click_tracking_created_at
   on public.checkout_click_tracking (created_at desc);
 
 alter table public.checkout_click_tracking enable row level security;
+drop index if exists public.idx_checkout_click_tracking_company_xcod_unique;
+
 create unique index if not exists idx_checkout_click_tracking_company_xcod_unique
-  on public.checkout_click_tracking (company_id, xcod)
-  where xcod is not null;
+  on public.checkout_click_tracking (company_id, xcod);

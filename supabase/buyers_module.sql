@@ -1,4 +1,4 @@
-create table public.webhook_logs (
+﻿create table public.webhook_logs (
   id uuid primary key default gen_random_uuid(),
 
   webhook_id text not null unique,
@@ -256,6 +256,7 @@ create table public.meta_daily_ad_insights (
   clicks integer not null default 0,
   inline_link_clicks integer not null default 0,
   landing_page_views integer not null default 0,
+  checkouts integer not null default 0,
 
   purchases integer not null default 0,
   purchase_value numeric(14,2) not null default 0,
@@ -386,6 +387,9 @@ create index idx_company_ad_accounts_ad_account_id
 create index idx_company_ad_accounts_company_active
   on public.company_ad_accounts (company_id, is_active);
 
+alter table public.meta_daily_ad_insights
+add column if not exists checkouts integer not null default 0;
+
 alter table public.meta_daily_ad_insights enable row level security;
 alter table public.meta_sync_state enable row level security;
 alter table public.company_ad_accounts enable row level security;
@@ -405,3 +409,5 @@ create trigger trg_company_ad_accounts_set_updated_at
 before update on public.company_ad_accounts
 for each row
 execute function public.set_updated_at();
+
+

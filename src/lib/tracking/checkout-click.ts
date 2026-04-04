@@ -211,8 +211,8 @@ export function buildElementorTrackingSnippet(companySlug: string, endpointUrl: 
     const prefix = name + "=";
     const parts = document.cookie.split(";");
 
-    for (let index = 0; index < parts.length; index += 1) {
-      const cookie = parts[index].trim();
+    for (let i = 0; i < parts.length; i++) {
+      const cookie = parts[i].trim();
 
       if (cookie.startsWith(prefix)) {
         return decodeURIComponent(cookie.slice(prefix.length));
@@ -227,9 +227,12 @@ export function buildElementorTrackingSnippet(companySlug: string, endpointUrl: 
   }
 
   function buildPayload() {
+    const xcodValue = readCookie("user_id_mh");
+    const ref = document.referrer && document.referrer !== "" ? document.referrer : window.location.href;
+
     return {
       company_slug: companySlug,
-      xcod: sessionStorage.getItem("user_id_mh"),
+      xcod: xcodValue,
       utm_source: readParam("utm_source"),
       utm_medium: readParam("utm_medium"),
       utm_campaign: readParam("utm_campaign"),
@@ -243,22 +246,14 @@ export function buildElementorTrackingSnippet(companySlug: string, endpointUrl: 
       language: navigator.language,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || null,
       page_url: window.location.href,
-      referrer: document.referrer || null,
+      referrer: ref,
       clicked_at: new Date().toISOString(),
     };
   }
 
   function sendTracking() {
-    const body = JSON.stringify(buildPayload());
-
-    if (navigator.sendBeacon) {
-      const blob = new Blob([body], { type: "application/json" });
-      const sent = navigator.sendBeacon(endpoint, blob);
-
-      if (sent) {
-        return;
-      }
-    }
+    const payload = buildPayload();
+    const body = JSON.stringify(payload);
 
     fetch(endpoint, {
       method: "POST",
@@ -268,29 +263,35 @@ export function buildElementorTrackingSnippet(companySlug: string, endpointUrl: 
         "Content-Type": "application/json",
       },
       body,
-    }).catch(function () {
-      return null;
+    }).catch(function (err) {
+      console.error("Erro ao enviar tracking:", err);
     });
   }
 
-  document.addEventListener(
-    "click",
-    function (event) {
-      const target = event.target;
+  document.addEventListener("click", function (event) {
+    const target = event.target;
 
-      if (!(target instanceof Element)) {
-        return;
-      }
+    if (!(target instanceof Element)) {
+      return;
+    }
 
-      const checkoutLink = target.closest(checkoutSelector);
+    const checkoutLink = target.closest(checkoutSelector);
 
-      if (!checkoutLink) {
-        return;
-      }
+    if (!checkoutLink) {
+      return;
+    }
 
-      sendTracking();
-    },
-    true
-  );
+    const destination = checkoutLink.href;
+    const isNewTab = checkoutLink.target === "_blank" || event.ctrlKey || event.metaKey;
+
+    sendTracking();
+
+    if (!isNewTab) {
+      event.preventDefault();
+      setTimeout(function () {
+        window.location.href = destination;
+      }, 300);
+    }
+  }, true);
 })();`;
 }

@@ -81,6 +81,7 @@ type MetaDailyAdInsightRow = {
   inline_link_clicks: number;
   landing_page_views: number;
   leads: number;
+  checkouts: number;
   messaging_conversations_started: number;
   purchase_value: number;
   purchases: number;
@@ -205,6 +206,10 @@ function isMessagingConversationStartedAction(actionType: string) {
   return actionType.includes("messaging_conversation_started");
 }
 
+function isCheckoutAction(actionType: string) {
+  return actionType.includes("initiate_checkout");
+}
+
 function isLeadAction(actionType: string) {
   return (
     actionType === "lead" ||
@@ -246,6 +251,7 @@ function buildInsightUpsertRow(
     inline_link_clicks: parseNumber(row.inline_link_clicks),
     landing_page_views: getActionValue(row.actions, isLandingPageViewAction),
     leads: getActionValue(row.actions, isLeadAction),
+    checkouts: getActionValue(row.actions, isCheckoutAction),
     messaging_conversations_started: getActionValue(row.actions, isMessagingConversationStartedAction),
     purchase_value: getActionValue(row.action_values, isPurchaseAction),
     purchases: getActionValue(row.actions, isPurchaseAction),
@@ -548,6 +554,7 @@ export async function listStoredMetaInsights(
       company_id,
       impressions,
       insight_date,
+      checkouts,
       inline_link_clicks,
       landing_page_views,
       leads,
@@ -599,3 +606,5 @@ export async function hasStoredCampaignTag(
 
   return Boolean(data?.length);
 }
+
+
