@@ -199,7 +199,7 @@ function isPurchaseAction(actionType: string) {
 }
 
 function isLandingPageViewAction(actionType: string) {
-  return actionType.includes("landing_page_view");
+  return actionType === "landing_page_view";
 }
 
 function isMessagingConversationStartedAction(actionType: string) {
@@ -207,7 +207,7 @@ function isMessagingConversationStartedAction(actionType: string) {
 }
 
 function isCheckoutAction(actionType: string) {
-  return actionType.includes("initiate_checkout");
+  return actionType === "initiate_checkout";
 }
 
 function isLeadAction(actionType: string) {
@@ -606,5 +606,7 @@ export async function hasStoredCampaignTag(
 
   return Boolean(data?.length);
 }
+
+
 
 
