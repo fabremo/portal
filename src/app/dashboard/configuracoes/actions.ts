@@ -3,13 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { getCompanyAiSettingsRecord } from "@/lib/dashboard/company-ai-settings";
 import { getDashboardAccessContext } from "@/lib/dashboard/access";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/service-role";
 
 const SETTINGS_PATH = "/dashboard/configuracoes";
 const UNIQUE_VIOLATION_ERROR_CODE = "23505";
 
-type SettingsSection = "ad-accounts" | "companies";
+type SettingsSection = "ad-accounts" | "ai" | "companies";
 
 type RedirectState = {
   companyId?: string;
@@ -359,6 +360,93 @@ export async function updateCompanyAction(formData: FormData) {
   redirectToSettings({
     companyId,
     message: "Empresa atualizada com sucesso.",
+    status: "success",
+  });
+}
+
+export async function saveCompanyAiSettingsAction(formData: FormData) {
+  await ensureAdminAccess();
+
+  const companyId = getTrimmedString(formData, "companyId");
+  const provider = getTrimmedString(formData, "provider") || "gemini";
+  const model = getTrimmedString(formData, "model");
+  const apiKey = getTrimmedString(formData, "apiKey");
+
+  if (!companyId) {
+    redirectToSettings({
+      message: "Selecione uma empresa para configurar a IA.",
+      section: "ai",
+      status: "error",
+    });
+  }
+
+  const companyExists = await ensureCompanyExists(companyId);
+
+  if (!companyExists) {
+    redirectToSettings({
+      message: "A empresa selecionada não foi encontrada.",
+      section: "ai",
+      status: "error",
+    });
+  }
+
+  if (!model) {
+    redirectToSettings({
+      companyId,
+      message: "Informe o modelo do Gemini antes de salvar.",
+      section: "ai",
+      status: "error",
+    });
+  }
+
+  const existingSettings = await getCompanyAiSettingsRecord(companyId);
+  const nextApiKey = apiKey || existingSettings?.apiKey || "";
+
+  if (!nextApiKey) {
+    redirectToSettings({
+      companyId,
+      message: "Informe a API key do Gemini antes de salvar.",
+      section: "ai",
+      status: "error",
+    });
+  }
+
+  const supabase = await ensureServiceRoleClient();
+  const { error } = await supabase.from("company_ai_settings").upsert(
+    {
+      api_key: nextApiKey,
+      company_id: companyId,
+      model,
+      provider,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "company_id" }
+  );
+
+  if (error?.code === UNIQUE_VIOLATION_ERROR_CODE) {
+    redirectToSettings({
+      companyId,
+      message: "Já existe uma configuração de IA vinculada a esta empresa.",
+      section: "ai",
+      status: "error",
+    });
+  }
+
+  if (error) {
+    redirectToSettings({
+      companyId,
+      message: "Não foi possível salvar a configuração de IA.",
+      section: "ai",
+      status: "error",
+    });
+  }
+
+  revalidatePath(SETTINGS_PATH);
+  revalidatePath("/dashboard/relatorios/vendas");
+  redirectToSettings({
+    companyId,
+    message: "Configuração de IA salva com sucesso.",
+    section: "ai",
     status: "success",
   });
 }

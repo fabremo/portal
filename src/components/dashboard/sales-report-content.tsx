@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BarChart3, LoaderCircle } from "lucide-react";
+import { BarChart3, LoaderCircle, Sparkles } from "lucide-react";
 
 import {
   type ClientSalesReportResult,
   useMetaReports,
 } from "@/components/dashboard/meta-reports-provider";
+import type { CompanyAiSettingsStatus } from "@/lib/dashboard/company-ai-settings-types";
 import {
   getReportDateRange,
   type ReportDatePreset,
@@ -15,6 +16,7 @@ import {
 type SalesReportContentProps = {
   activeAdAccountName: string;
   adAccountId: string;
+  companyAiStatus: CompanyAiSettingsStatus;
   initialPreset?: ReportDatePreset;
   initialReport: ClientSalesReportResult;
 };
@@ -85,6 +87,13 @@ function formatCurrency(value: number) {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("pt-BR").format(new Date(`${value}T00:00:00`));
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 function formatNumber(value: number) {
@@ -160,6 +169,45 @@ function renderPresetButtons(
       </button>
     );
   });
+}
+
+function buildAiContextPreview(
+  report: ClientSalesReportResult,
+  activeAdAccountName: string
+) {
+  const header = [
+    `Conta ativa: ${activeAdAccountName}`,
+    `Período: ${formatDate(report.since)} a ${formatDate(report.until)}`,
+  ];
+
+  if (report.state === "ok") {
+    const totalAmountSpent = report.rows.reduce((total, row) => total + row.amountSpent, 0);
+    const totalPurchases = report.rows.reduce((total, row) => total + row.purchases, 0);
+    const totalRevenue = report.rows.reduce((total, row) => total + row.purchaseValue, 0);
+
+    return [
+      ...header,
+      `Campanhas com dados: ${formatNumber(report.rows.length)}`,
+      `Investimento total: ${formatCurrency(totalAmountSpent)}`,
+      `Compras totais: ${formatNumber(totalPurchases)}`,
+      `Faturamento total: ${formatCurrency(totalRevenue)}`,
+      report.funnelSummary
+        ? `Funil: ${formatNumber(report.funnelSummary.impressions)} impressões, ${formatNumber(report.funnelSummary.linkClicks)} cliques, ${formatNumber(report.funnelSummary.checkouts)} checkouts, ${formatNumber(report.funnelSummary.purchases)} vendas`
+        : "Funil: indisponível",
+    ].join("\n");
+  }
+
+  if (report.state === "empty") {
+    return [
+      ...header,
+      "Status do relatório: sem campanhas de vendas com dados no período selecionado.",
+    ].join("\n");
+  }
+
+  return [
+    ...header,
+    `Status do relatório: ${report.message}`,
+  ].join("\n");
 }
 
 function SalesFunnel({ report }: { report: Extract<ClientSalesReportResult, { state: "ok" }> }) {
@@ -260,9 +308,133 @@ function SalesFunnel({ report }: { report: Extract<ClientSalesReportResult, { st
   );
 }
 
+function SalesAiAssistantCard({
+  activeAdAccountName,
+  companyAiStatus,
+  report,
+}: {
+  activeAdAccountName: string;
+  companyAiStatus: CompanyAiSettingsStatus;
+  report: ClientSalesReportResult;
+}) {
+  const [prompt, setPrompt] = useState("");
+  const [includeReportContext, setIncludeReportContext] = useState(true);
+  const contextPreview = buildAiContextPreview(report, activeAdAccountName);
+  const isConfigured = companyAiStatus.isConfigured;
+
+  return (
+    <article className="overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white shadow-card">
+      <div className="border-b border-gray-200 px-6 py-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-accent/15 bg-accent/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+              <Sparkles className="h-3.5 w-3.5" />
+              Inteligência artificial
+            </div>
+            <h3 className="mt-3 text-xl font-semibold text-ink">Assistente do relatório de vendas</h3>
+            <p className="mt-2 max-w-3xl text-sm text-ink/72">
+              Escreva um prompt como se estivesse em um chat. A execução com Gemini entra na próxima etapa; por enquanto, este bloco prepara a experiência e mostra a configuração ativa da empresa.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-black/5 bg-background px-4 py-3 text-sm text-ink/68 lg:max-w-sm">
+            {isConfigured ? (
+              <>
+                <p className="font-medium text-ink">Configuração ativa</p>
+                <p className="mt-1">
+                  {companyAiStatus.provider?.toUpperCase()} • {companyAiStatus.model}
+                </p>
+                {companyAiStatus.updatedAt ? (
+                  <p className="mt-1 text-xs text-ink/55">
+                    Atualizada em {formatDateTime(companyAiStatus.updatedAt)}
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <p className="font-medium text-ink">Configuração pendente</p>
+                <p className="mt-1">A empresa ativa ainda não tem uma API key e um modelo Gemini salvos.</p>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.95fr)]">
+        <div className="space-y-4">
+          <label className="block space-y-2">
+            <span className="text-sm font-medium text-ink">Prompt</span>
+            <textarea
+              className="min-h-[220px] w-full rounded-[1.5rem] border border-gray-200 bg-background px-4 py-4 text-sm text-ink outline-none transition placeholder:text-ink/35 focus:border-accent/45 focus:ring-2 focus:ring-accent/12"
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder="Ex.: Analise os dados deste período, aponte gargalos no funil e sugira três próximos testes para as campanhas de vendas."
+              value={prompt}
+            />
+          </label>
+
+          <label className="flex items-start gap-3 rounded-[1.35rem] border border-gray-200 bg-background/55 px-4 py-4 text-sm text-ink transition hover:border-accent/25">
+            <input
+              checked={includeReportContext}
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent"
+              onChange={(event) => setIncludeReportContext(event.target.checked)}
+              type="checkbox"
+            />
+            <span>
+              <span className="block font-medium text-ink">Incluir contexto do relatório atual</span>
+              <span className="mt-1 block text-ink/62">
+                Quando a integração estiver ativa, o prompt poderá seguir junto com um resumo do período, da conta ativa e do status do relatório.
+              </span>
+            </span>
+          </label>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-ink/60">
+              {isConfigured
+                ? "A empresa já possui uma configuração Gemini pronta para a próxima etapa da integração."
+                : "A integração real depende de cadastrar a API key e o modelo da empresa na aba IA."}
+            </p>
+            <button
+              className="inline-flex items-center justify-center rounded-2xl bg-ink px-5 py-3 text-sm font-medium text-white opacity-55"
+              disabled
+              type="button"
+            >
+              Enviar em breve
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-[1.5rem] border border-gray-200 bg-background/55 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink/48">Contexto disponível</p>
+            <p className="mt-2 text-sm text-ink/66">
+              {includeReportContext
+                ? "Prévia do resumo que poderá acompanhar o prompt quando a integração for ligada."
+                : "O envio do contexto automático está desativado neste rascunho."}
+            </p>
+            <div className="mt-4 rounded-[1.25rem] border border-gray-200 bg-white p-4">
+              {includeReportContext ? (
+                <pre className="whitespace-pre-wrap break-words text-sm text-ink/74">{contextPreview}</pre>
+              ) : (
+                <p className="text-sm text-ink/55">Somente o texto digitado no editor será considerado.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[1.5rem] border border-dashed border-gray-200 bg-white p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink/48">Rascunho atual</p>
+            <div className="mt-3 rounded-[1.25rem] bg-background px-4 py-4 text-sm text-ink/70">
+              {prompt.trim() ? prompt : "Seu prompt vai aparecer aqui conforme você escreve."}
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export function SalesReportContent({
   activeAdAccountName,
   adAccountId,
+  companyAiStatus,
   initialPreset = "last_7_days",
   initialReport,
 }: SalesReportContentProps) {
@@ -358,10 +530,7 @@ export function SalesReportContent({
     );
   }
 
-  const lastCheckedAt = new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(report.lastCheckedAt));
+  const lastCheckedAt = formatDateTime(report.lastCheckedAt);
   const dateRangeLabel = `${formatDate(report.since)} a ${formatDate(report.until)}`;
 
   return (
@@ -521,6 +690,12 @@ export function SalesReportContent({
           <SalesFunnel report={report} />
         </div>
       ) : null}
+
+      <SalesAiAssistantCard
+        activeAdAccountName={activeAdAccountName}
+        companyAiStatus={companyAiStatus}
+        report={report}
+      />
     </section>
   );
 }

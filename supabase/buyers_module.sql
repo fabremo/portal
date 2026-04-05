@@ -1,4 +1,4 @@
-﻿create table public.webhook_logs (
+create table public.webhook_logs (
   id uuid primary key default gen_random_uuid(),
 
   webhook_id text not null unique,
@@ -409,5 +409,17 @@ create trigger trg_company_ad_accounts_set_updated_at
 before update on public.company_ad_accounts
 for each row
 execute function public.set_updated_at();
+create table if not exists public.company_ai_settings (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references public.companies(id) on delete cascade unique,
+  provider text not null default 'gemini',
+  model text not null,
+  api_key text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 
+create index if not exists idx_company_ai_settings_company_id
+  on public.company_ai_settings (company_id);
 
+alter table public.company_ai_settings enable row level security;
