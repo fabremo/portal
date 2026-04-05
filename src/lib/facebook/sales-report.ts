@@ -1,4 +1,4 @@
-﻿import "server-only";
+import "server-only";
 
 import {
   ensureMetaInsightsReady,
@@ -67,13 +67,23 @@ export type FacebookSalesReportResult =
       until: string;
     }
   | {
+      adRows: [];
+      dailyRows: [];
+      funnelSummary: null;
+      lastCheckedAt: string;
+      rows: [];
+      since: string;
+      state: "empty";
+      until: string;
+    }
+  | {
       adRows: FacebookSalesAdRow[];
       dailyRows: FacebookSalesDailyRow[];
-      funnelSummary: FacebookSalesFunnelSummary | null;
+      funnelSummary: FacebookSalesFunnelSummary;
       lastCheckedAt: string;
       rows: FacebookSalesRow[];
       since: string;
-      state: "empty" | "ok";
+      state: "ok";
       until: string;
     };
 

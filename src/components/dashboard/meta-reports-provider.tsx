@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   createContext,
@@ -67,13 +67,23 @@ export type ClientSalesReportResult =
       until: string;
     }
   | {
+      adRows: [];
+      dailyRows: [];
+      funnelSummary: null;
+      lastCheckedAt: string;
+      rows: [];
+      since: string;
+      state: "empty";
+      until: string;
+    }
+  | {
       adRows: SalesAdRow[];
       dailyRows: SalesDailyRow[];
-      funnelSummary: SalesFunnelSummary | null;
+      funnelSummary: SalesFunnelSummary;
       lastCheckedAt: string;
       rows: SalesRow[];
       since: string;
-      state: "empty" | "ok";
+      state: "ok";
       until: string;
     };
 

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { BarChart3, LoaderCircle } from "lucide-react";
@@ -407,7 +407,7 @@ export function SalesReportContent({
             Existem campanhas com [VENDAS], mas a Meta não retornou resultados para o período selecionado.
           </p>
         </article>
-      ) : (
+      ) : report.state === "ok" ? (
         <div className="space-y-6">
           <article className="overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white shadow-card">
             <div className="border-b border-gray-200 px-6 py-5">
@@ -520,7 +520,7 @@ export function SalesReportContent({
 
           <SalesFunnel report={report} />
         </div>
-      )}
+      ) : null}
     </section>
   );
 }
