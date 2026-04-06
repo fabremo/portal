@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { listGeminiModels } from "@/lib/ai/gemini";
+
 import { getCompanyAiSettingsRecord } from "@/lib/dashboard/company-ai-settings";
 import { getDashboardAccessContext } from "@/lib/dashboard/access";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/service-role";
@@ -390,15 +392,6 @@ export async function saveCompanyAiSettingsAction(formData: FormData) {
     });
   }
 
-  if (!model) {
-    redirectToSettings({
-      companyId,
-      message: "Informe o modelo do Gemini antes de salvar.",
-      section: "ai",
-      status: "error",
-    });
-  }
-
   const existingSettings = await getCompanyAiSettingsRecord(companyId);
   const nextApiKey = apiKey || existingSettings?.apiKey || "";
 
@@ -411,12 +404,38 @@ export async function saveCompanyAiSettingsAction(formData: FormData) {
     });
   }
 
+  let nextModel = model || existingSettings?.model || "";
+
+  if (!nextModel && provider === "gemini") {
+    try {
+      const availableModels = await listGeminiModels(nextApiKey);
+      nextModel = availableModels[0]?.value ?? "";
+    } catch {
+      redirectToSettings({
+        companyId,
+        message: "Não foi possível carregar os modelos do Gemini com a API key informada.",
+        section: "ai",
+        status: "error",
+      });
+    }
+  }
+
+  if (!nextModel) {
+    redirectToSettings({
+      companyId,
+      message: "Selecione um modelo do Gemini antes de salvar.",
+      section: "ai",
+      status: "error",
+    });
+  }
+
   const supabase = await ensureServiceRoleClient();
   const { error } = await supabase.from("company_ai_settings").upsert(
     {
       api_key: nextApiKey,
       company_id: companyId,
-      model,
+      is_enabled: true,
+      model: nextModel,
       provider,
       updated_at: new Date().toISOString(),
     },
@@ -446,6 +465,112 @@ export async function saveCompanyAiSettingsAction(formData: FormData) {
   redirectToSettings({
     companyId,
     message: "Configuração de IA salva com sucesso.",
+    section: "ai",
+    status: "success",
+  });
+}
+
+export async function clearCompanyAiApiKeyAction(formData: FormData) {
+  await ensureAdminAccess();
+
+  const companyId = getTrimmedString(formData, "companyId");
+
+  if (!companyId) {
+    redirectToSettings({
+      message: "Selecione uma empresa para limpar a API key.",
+      section: "ai",
+      status: "error",
+    });
+  }
+
+  const supabase = await ensureServiceRoleClient();
+  const { error } = await supabase
+    .from("company_ai_settings")
+    .update({
+      api_key: null,
+      is_enabled: false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("company_id", companyId);
+
+  if (error) {
+    redirectToSettings({
+      companyId,
+      message: "Não foi possível limpar a API key da empresa.",
+      section: "ai",
+      status: "error",
+    });
+  }
+
+  revalidatePath(SETTINGS_PATH);
+  revalidatePath("/dashboard/relatorios/vendas");
+  redirectToSettings({
+    companyId,
+    message: "API key removida e IA desabilitada com sucesso.",
+    section: "ai",
+    status: "success",
+  });
+}
+
+export async function toggleCompanyAiSettingsActiveAction(formData: FormData) {
+  await ensureAdminAccess();
+
+  const companyId = getTrimmedString(formData, "companyId");
+  const nextIsEnabled = getTrimmedString(formData, "nextIsEnabled") === "true";
+
+  if (!companyId) {
+    redirectToSettings({
+      message: "Selecione uma empresa antes de alterar o status da IA.",
+      section: "ai",
+      status: "error",
+    });
+  }
+
+  const existingSettings = await getCompanyAiSettingsRecord(companyId);
+
+  if (!existingSettings) {
+    redirectToSettings({
+      companyId,
+      message: "Cadastre a API key e escolha um modelo antes de alterar o status da IA.",
+      section: "ai",
+      status: "error",
+    });
+  }
+
+  if (nextIsEnabled && !existingSettings.apiKey) {
+    redirectToSettings({
+      companyId,
+      message: "Cadastre uma API key válida antes de habilitar a IA.",
+      section: "ai",
+      status: "error",
+    });
+  }
+
+  const supabase = await ensureServiceRoleClient();
+  const { error } = await supabase
+    .from("company_ai_settings")
+    .update({
+      is_enabled: nextIsEnabled,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("company_id", companyId);
+
+  if (error) {
+    redirectToSettings({
+      companyId,
+      message: "Não foi possível atualizar o status da IA.",
+      section: "ai",
+      status: "error",
+    });
+  }
+
+  revalidatePath(SETTINGS_PATH);
+  revalidatePath("/dashboard/relatorios/vendas");
+  redirectToSettings({
+    companyId,
+    message: nextIsEnabled
+      ? "IA habilitada com sucesso para a empresa."
+      : "IA desabilitada com sucesso para a empresa.",
     section: "ai",
     status: "success",
   });

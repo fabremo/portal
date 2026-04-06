@@ -16,6 +16,7 @@ import {
 type SalesReportContentProps = {
   activeAdAccountName: string;
   adAccountId: string;
+  activeCompanyId: string;
   companyAiStatus: CompanyAiSettingsStatus;
   initialPreset?: ReportDatePreset;
   initialReport: ClientSalesReportResult;
@@ -173,41 +174,183 @@ function renderPresetButtons(
 
 function buildAiContextPreview(
   report: ClientSalesReportResult,
-  activeAdAccountName: string
+  activeAdAccountName: string,
+  activeCompanyId: string,
+  adAccountId: string
 ) {
-  const header = [
-    `Conta ativa: ${activeAdAccountName}`,
-    `Período: ${formatDate(report.since)} a ${formatDate(report.until)}`,
-  ];
+  const context = {
+    campaigns:
+      report.state === "ok"
+        ? report.rows.map((row) => ({
+            amountSpent: row.amountSpent,
+            campaignId: row.campaignId,
+            campaignName: row.campaignName,
+            purchaseValue: row.purchaseValue,
+            purchases: row.purchases,
+            roas: row.roas,
+          }))
+        : [],
+    funnel:
+      report.state === "ok" && report.funnelSummary
+        ? {
+            checkouts: report.funnelSummary.checkouts,
+            connectRate: report.funnelSummary.connectRate,
+            costPerCheckout: report.funnelSummary.costPerCheckout,
+            costPerLinkClick: report.funnelSummary.costPerLinkClick,
+            costPerPurchase: report.funnelSummary.costPerPurchase,
+            cpm: report.funnelSummary.cpm,
+            impressions: report.funnelSummary.impressions,
+            landingPageViews: report.funnelSummary.landingPageViews,
+            linkClicks: report.funnelSummary.linkClicks,
+            linkCtr: report.funnelSummary.linkCtr,
+            purchases: report.funnelSummary.purchases,
+          }
+        : null,
+    meta: {
+      activeAdAccountName,
+      adAccountId,
+      companyId: activeCompanyId,
+      since: report.since,
+      state: report.state,
+      until: report.until,
+    },
+    summary:
+      report.state === "ok"
+        ? {
+            campaignCount: report.rows.length,
+            totalAmountSpent: report.rows.reduce((total, row) => total + row.amountSpent, 0),
+            totalPurchaseValue: report.rows.reduce((total, row) => total + row.purchaseValue, 0),
+            totalPurchases: report.rows.reduce((total, row) => total + row.purchases, 0),
+          }
+        : {
+            campaignCount: 0,
+            totalAmountSpent: 0,
+            totalPurchaseValue: 0,
+            totalPurchases: 0,
+          },
+  };
 
-  if (report.state === "ok") {
-    const totalAmountSpent = report.rows.reduce((total, row) => total + row.amountSpent, 0);
-    const totalPurchases = report.rows.reduce((total, row) => total + row.purchases, 0);
-    const totalRevenue = report.rows.reduce((total, row) => total + row.purchaseValue, 0);
+  return JSON.stringify(context, null, 2);
+}
 
-    return [
-      ...header,
-      `Campanhas com dados: ${formatNumber(report.rows.length)}`,
-      `Investimento total: ${formatCurrency(totalAmountSpent)}`,
-      `Compras totais: ${formatNumber(totalPurchases)}`,
-      `Faturamento total: ${formatCurrency(totalRevenue)}`,
-      report.funnelSummary
-        ? `Funil: ${formatNumber(report.funnelSummary.impressions)} impressões, ${formatNumber(report.funnelSummary.linkClicks)} cliques, ${formatNumber(report.funnelSummary.checkouts)} checkouts, ${formatNumber(report.funnelSummary.purchases)} vendas`
-        : "Funil: indisponível",
-    ].join("\n");
+function renderMarkdownInline(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={`${part}-${index}`}>{part.slice(2, -2)}</strong>;
+    }
+
+    return <span key={`${part}-${index}`}>{part}</span>;
+  });
+}
+
+function renderAiAnswer(answer: string) {
+  const lines = answer.split(/\r?\n/);
+  const blocks: React.ReactNode[] = [];
+  let bulletItems: string[] = [];
+  let orderedItems: string[] = [];
+
+  function flushBullets() {
+    if (!bulletItems.length) {
+      return;
+    }
+
+    blocks.push(
+      <ul className="list-disc space-y-2 pl-5" key={`bullets-${blocks.length}`}>
+        {bulletItems.map((item, index) => (
+          <li key={`${item}-${index}`}>{renderMarkdownInline(item)}</li>
+        ))}
+      </ul>
+    );
+    bulletItems = [];
   }
 
-  if (report.state === "empty") {
-    return [
-      ...header,
-      "Status do relatório: sem campanhas de vendas com dados no período selecionado.",
-    ].join("\n");
+  function flushOrdered() {
+    if (!orderedItems.length) {
+      return;
+    }
+
+    blocks.push(
+      <ol className="list-decimal space-y-2 pl-5" key={`ordered-${blocks.length}`}>
+        {orderedItems.map((item, index) => (
+          <li key={`${item}-${index}`}>{renderMarkdownInline(item)}</li>
+        ))}
+      </ol>
+    );
+    orderedItems = [];
   }
 
-  return [
-    ...header,
-    `Status do relatório: ${report.message}`,
-  ].join("\n");
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+
+    if (!line) {
+      flushBullets();
+      flushOrdered();
+      continue;
+    }
+
+    if (line === "---") {
+      flushBullets();
+      flushOrdered();
+      blocks.push(<hr className="border-emerald-200" key={`hr-${blocks.length}`} />);
+      continue;
+    }
+
+    const orderedMatch = line.match(/^\d+\.\s+(.*)$/);
+    if (orderedMatch) {
+      flushBullets();
+      orderedItems.push(orderedMatch[1]);
+      continue;
+    }
+
+    if (line.startsWith("*   ") || line.startsWith("* ")) {
+      flushOrdered();
+      bulletItems.push(line.replace(/^\*\s+/, ""));
+      continue;
+    }
+
+    flushBullets();
+    flushOrdered();
+
+    if (line.startsWith("### ")) {
+      blocks.push(
+        <h4 className="text-lg font-semibold text-emerald-950" key={`h3-${blocks.length}`}>
+          {renderMarkdownInline(line.slice(4))}
+        </h4>
+      );
+      continue;
+    }
+
+    if (line.startsWith("## ")) {
+      blocks.push(
+        <h4 className="text-xl font-semibold text-emerald-950" key={`h2-${blocks.length}`}>
+          {renderMarkdownInline(line.slice(3))}
+        </h4>
+      );
+      continue;
+    }
+
+    if (line.startsWith("# ")) {
+      blocks.push(
+        <h4 className="text-2xl font-semibold text-emerald-950" key={`h1-${blocks.length}`}>
+          {renderMarkdownInline(line.slice(2))}
+        </h4>
+      );
+      continue;
+    }
+
+    blocks.push(
+      <p className="leading-7 text-emerald-950" key={`p-${blocks.length}`}>
+        {renderMarkdownInline(line)}
+      </p>
+    );
+  }
+
+  flushBullets();
+  flushOrdered();
+
+  return <div className="space-y-4">{blocks}</div>;
 }
 
 function SalesFunnel({ report }: { report: Extract<ClientSalesReportResult, { state: "ok" }> }) {
@@ -309,18 +452,76 @@ function SalesFunnel({ report }: { report: Extract<ClientSalesReportResult, { st
 }
 
 function SalesAiAssistantCard({
+  activeCompanyId,
   activeAdAccountName,
+  adAccountId,
   companyAiStatus,
   report,
+  selectedPreset,
 }: {
+  activeCompanyId: string;
   activeAdAccountName: string;
+  adAccountId: string;
   companyAiStatus: CompanyAiSettingsStatus;
   report: ClientSalesReportResult;
+  selectedPreset: ReportDatePreset;
 }) {
   const [prompt, setPrompt] = useState("");
   const [includeReportContext, setIncludeReportContext] = useState(true);
-  const contextPreview = buildAiContextPreview(report, activeAdAccountName);
+  const [answer, setAnswer] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const contextPreview = buildAiContextPreview(
+    report,
+    activeAdAccountName,
+    activeCompanyId,
+    adAccountId
+  );
   const isConfigured = companyAiStatus.isConfigured;
+
+  async function handleSubmit() {
+    if (!prompt.trim()) {
+      setErrorMessage("Digite um prompt antes de enviar.");
+      setAnswer("");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage("");
+    setAnswer("");
+
+    try {
+      const response = await fetch("/api/dashboard/reports/sales/ai", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          adAccountId,
+          includeReportContext,
+          preset: selectedPreset,
+          prompt: prompt.trim(),
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        answer?: string;
+        message?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.message || "Não foi possível obter a resposta da IA.");
+      }
+
+      setAnswer(payload.answer || "");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Não foi possível obter a resposta da IA."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <article className="overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white shadow-card">
@@ -333,7 +534,7 @@ function SalesAiAssistantCard({
             </div>
             <h3 className="mt-3 text-xl font-semibold text-ink">Assistente do relatório de vendas</h3>
             <p className="mt-2 max-w-3xl text-sm text-ink/72">
-              Escreva um prompt como se estivesse em um chat. A execução com Gemini entra na próxima etapa; por enquanto, este bloco prepara a experiência e mostra a configuração ativa da empresa.
+              Escreva um prompt como se estivesse em um chat. Agora o envio usa Gemini e pode seguir com um contexto JSON estruturado de funil e campanhas.
             </p>
           </div>
           <div className="rounded-2xl border border-black/5 bg-background px-4 py-3 text-sm text-ink/68 lg:max-w-sm">
@@ -381,7 +582,7 @@ function SalesAiAssistantCard({
             <span>
               <span className="block font-medium text-ink">Incluir contexto do relatório atual</span>
               <span className="mt-1 block text-ink/62">
-                Quando a integração estiver ativa, o prompt poderá seguir junto com um resumo do período, da conta ativa e do status do relatório.
+                O envio pode incluir um JSON estruturado com metadados, resumo, funil e campanhas do período selecionado.
               </span>
             </span>
           </label>
@@ -389,15 +590,16 @@ function SalesAiAssistantCard({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-ink/60">
               {isConfigured
-                ? "A empresa já possui uma configuração Gemini pronta para a próxima etapa da integração."
+                ? "A empresa já possui uma configuração Gemini válida para responder ao seu prompt."
                 : "A integração real depende de cadastrar a API key e o modelo da empresa na aba IA."}
             </p>
             <button
-              className="inline-flex items-center justify-center rounded-2xl bg-ink px-5 py-3 text-sm font-medium text-white opacity-55"
-              disabled
+              className="inline-flex items-center justify-center rounded-2xl bg-ink px-5 py-3 text-sm font-medium text-white transition hover:bg-ink/92 disabled:cursor-not-allowed disabled:opacity-55"
+              disabled={isSubmitting || !prompt.trim()}
+              onClick={handleSubmit}
               type="button"
             >
-              Enviar em breve
+              {isSubmitting ? "Consultando IA..." : "Enviar para IA"}
             </button>
           </div>
         </div>
@@ -407,12 +609,12 @@ function SalesAiAssistantCard({
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink/48">Contexto disponível</p>
             <p className="mt-2 text-sm text-ink/66">
               {includeReportContext
-                ? "Prévia do resumo que poderá acompanhar o prompt quando a integração for ligada."
-                : "O envio do contexto automático está desativado neste rascunho."}
+                ? "Prévia do JSON estruturado que acompanhará o prompt nesta etapa."
+                : "O envio do contexto automático está desativado neste envio."}
             </p>
             <div className="mt-4 rounded-[1.25rem] border border-gray-200 bg-white p-4">
               {includeReportContext ? (
-                <pre className="whitespace-pre-wrap break-words text-sm text-ink/74">{contextPreview}</pre>
+                <pre className="max-h-[360px] overflow-auto whitespace-pre-wrap break-words text-sm text-ink/74">{contextPreview}</pre>
               ) : (
                 <p className="text-sm text-ink/55">Somente o texto digitado no editor será considerado.</p>
               )}
@@ -425,6 +627,21 @@ function SalesAiAssistantCard({
               {prompt.trim() ? prompt : "Seu prompt vai aparecer aqui conforme você escreve."}
             </div>
           </div>
+
+          {errorMessage ? (
+            <div className="rounded-[1.5rem] border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+              {errorMessage}
+            </div>
+          ) : null}
+
+          {answer ? (
+            <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                Resposta da IA
+              </p>
+              <div className="mt-3 text-sm">{renderAiAnswer(answer)}</div>
+            </div>
+          ) : null}
         </div>
       </div>
     </article>
@@ -432,6 +649,7 @@ function SalesAiAssistantCard({
 }
 
 export function SalesReportContent({
+  activeCompanyId,
   activeAdAccountName,
   adAccountId,
   companyAiStatus,
@@ -692,9 +910,12 @@ export function SalesReportContent({
       ) : null}
 
       <SalesAiAssistantCard
+        activeCompanyId={activeCompanyId}
         activeAdAccountName={activeAdAccountName}
+        adAccountId={adAccountId}
         companyAiStatus={companyAiStatus}
         report={report}
+        selectedPreset={selectedPreset}
       />
     </section>
   );

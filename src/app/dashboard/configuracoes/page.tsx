@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 
 import { getDashboardAccessContext } from "@/lib/dashboard/access";
-import { getCompanyAiSettingsStatuses } from "@/lib/dashboard/company-ai-settings";
 import { getCompanySettingsData } from "@/lib/dashboard/company-settings";
 
 import {
@@ -23,13 +22,13 @@ import {
   createCompanyAction,
   createCompanyAdAccountAction,
   createCompanyProductAction,
-  saveCompanyAiSettingsAction,
   toggleAdAccountActiveAction,
   toggleCompanyAdAccountActiveAction,
   toggleCompanyProductActiveAction,
   updateCompanyAction,
   updateCompanyProductAction,
 } from "./actions";
+import { AiSettingsSection } from "./ai-settings-section";
 
 export const metadata: Metadata = {
   title: "Configurações",
@@ -83,7 +82,6 @@ export default async function DashboardSettingsPage({ searchParams }: DashboardS
   }
 
   const { availableAdAccounts, companies, users } = await getCompanySettingsData();
-  const aiStatuses = await getCompanyAiSettingsStatuses(companies.map((company) => company.id));
   const activeSection: SettingsSection =
     resolvedSearchParams?.section === "ad-accounts"
       ? "ad-accounts"
@@ -94,7 +92,6 @@ export default async function DashboardSettingsPage({ searchParams }: DashboardS
   const selectedCompany = companies.find((company) => company.id === selectedCompanyId) ?? companies[0] ?? null;
   const selectedUserIds = new Set(selectedCompany?.memberships.map((membership) => membership.userId) ?? []);
   const linkableAdAccounts = availableAdAccounts.filter((account) => !account.isBound);
-  const selectedAiStatus = selectedCompany ? aiStatuses.get(selectedCompany.id) ?? null : null;
   const message = resolvedSearchParams?.message;
   const status = resolvedSearchParams?.status === "success" ? "success" : "error";
 
@@ -552,183 +549,7 @@ export default async function DashboardSettingsPage({ searchParams }: DashboardS
           </div>
         </div>
       ) : activeSection === "ai" ? (
-        <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
-          <article className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-card md:p-7">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-ink/45">Provider</p>
-                <h3 className="mt-2 text-xl font-semibold text-ink">Gemini por empresa</h3>
-                <p className="mt-2 text-sm text-ink/68">
-                  Defina a credencial e o modelo usados pela empresa selecionada. O bloco de IA no relatório de vendas consome este status, mas a execução real entra em uma próxima etapa.
-                </p>
-              </div>
-              <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/8 text-accent">
-                <Sparkles className="h-5 w-5" />
-              </span>
-            </div>
-
-            <div className="mt-6 space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink/45">Empresas disponíveis</p>
-              {companies.length ? (
-                companies.map((company) => {
-                  const isSelected = company.id === selectedCompany?.id;
-                  const aiStatus = aiStatuses.get(company.id);
-
-                  return (
-                    <a
-                      className={[
-                        "block rounded-[1.4rem] border px-4 py-4 transition",
-                        isSelected
-                          ? "border-accent/30 bg-accent/[0.06] shadow-card"
-                          : "border-gray-200 bg-background/70 hover:border-accent/20 hover:bg-accent/[0.03]",
-                      ].join(" ")}
-                      href={buildSettingsHref("ai", company.id)}
-                      key={company.id}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-ink">{company.name}</p>
-                          <p className="mt-1 text-sm text-ink/62">{company.slug}</p>
-                        </div>
-                        <span className={[
-                          "rounded-full border px-3 py-1 text-xs font-medium",
-                          aiStatus?.isConfigured
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : "border-amber-200 bg-amber-50 text-amber-700",
-                        ].join(" ")}>
-                          {aiStatus?.isConfigured ? "Configurada" : "Pendente"}
-                        </span>
-                      </div>
-                    </a>
-                  );
-                })
-              ) : (
-                <div className="rounded-[1.4rem] border border-dashed border-gray-200 bg-background/55 px-4 py-8 text-center text-sm text-ink/58">
-                  Cadastre uma empresa para liberar a configuração de IA.
-                </div>
-              )}
-            </div>
-          </article>
-
-          {selectedCompany ? (
-            <article className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-card md:p-7">
-              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-ink/45">Empresa selecionada</p>
-                  <h3 className="mt-2 text-2xl font-semibold text-ink">IA de {selectedCompany.name}</h3>
-                  <p className="mt-2 max-w-3xl text-sm text-ink/68">
-                    Salve a API key do Gemini e o modelo padrão desta empresa. O segredo fica disponível apenas no servidor e o relatório mostra somente o status da configuração.
-                  </p>
-                </div>
-                <div
-                  className={[
-                    "rounded-2xl border px-4 py-3 text-sm",
-                    selectedAiStatus?.isConfigured
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                      : "border-amber-200 bg-amber-50 text-amber-700",
-                  ].join(" ")}
-                >
-                  {selectedAiStatus?.isConfigured ? "Gemini configurado" : "Configuração pendente"}
-                </div>
-              </div>
-
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
-                <div className="rounded-[1.35rem] border border-gray-200 bg-background/60 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink/45">Provider</p>
-                  <p className="mt-2 text-sm font-medium text-ink">
-                    {selectedAiStatus?.provider?.toUpperCase() ?? "GEMINI"}
-                  </p>
-                </div>
-                <div className="rounded-[1.35rem] border border-gray-200 bg-background/60 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink/45">Modelo atual</p>
-                  <p className="mt-2 text-sm font-medium text-ink">{selectedAiStatus?.model ?? "Ainda não definido"}</p>
-                </div>
-                <div className="rounded-[1.35rem] border border-gray-200 bg-background/60 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink/45">Última atualização</p>
-                  <p className="mt-2 text-sm font-medium text-ink">
-                    {selectedAiStatus?.updatedAt ? formatDateTime(selectedAiStatus.updatedAt) : "Sem registro"}
-                  </p>
-                </div>
-              </div>
-
-              <form action={saveCompanyAiSettingsAction} className="mt-8 space-y-6">
-                <input name="companyId" type="hidden" value={selectedCompany.id} />
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-ink" htmlFor="ai-provider">
-                      Provider
-                    </label>
-                    <input
-                      className="w-full rounded-2xl border border-gray-200 bg-background px-4 py-3 text-sm text-ink outline-none"
-                      defaultValue="gemini"
-                      id="ai-provider"
-                      name="provider"
-                      readOnly
-                      type="text"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-ink" htmlFor="ai-model">
-                      Modelo
-                    </label>
-                    <input
-                      className="w-full rounded-2xl border border-gray-200 bg-background px-4 py-3 text-sm text-ink outline-none transition placeholder:text-ink/35 focus:border-accent/45 focus:ring-2 focus:ring-accent/12"
-                      defaultValue={selectedAiStatus?.model ?? "gemini-2.0-flash"}
-                      id="ai-model"
-                      name="model"
-                      placeholder="gemini-2.0-flash"
-                      required
-                      type="text"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-ink" htmlFor="ai-api-key">
-                    API key
-                  </label>
-                  <input
-                    className="w-full rounded-2xl border border-gray-200 bg-background px-4 py-3 text-sm text-ink outline-none transition placeholder:text-ink/35 focus:border-accent/45 focus:ring-2 focus:ring-accent/12"
-                    id="ai-api-key"
-                    name="apiKey"
-                    placeholder={
-                      selectedAiStatus?.hasApiKey
-                        ? "Deixe em branco para manter a chave atual"
-                        : "Cole a API key do Gemini"
-                    }
-                    type="password"
-                  />
-                  <p className="text-xs text-ink/55">
-                    {selectedAiStatus?.hasApiKey
-                      ? "A chave atual já está salva. Preencha este campo apenas se quiser substituir o segredo da empresa."
-                      : "A chave fica armazenada apenas no servidor e não volta para a interface após o salvamento."}
-                  </p>
-                </div>
-
-                <div className="flex justify-end border-t border-gray-100 pt-6">
-                  <button
-                    className="inline-flex items-center justify-center rounded-2xl bg-accent px-5 py-3 text-sm font-medium text-white transition hover:bg-accent/92"
-                    type="submit"
-                  >
-                    Salvar configuração de IA
-                  </button>
-                </div>
-              </form>
-            </article>
-          ) : (
-            <div className="rounded-[1.75rem] border border-dashed border-gray-200 bg-background/55 px-6 py-14 text-center shadow-card">
-              <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/8 text-accent">
-                <Sparkles className="h-6 w-6" />
-              </div>
-              <h3 className="mt-5 text-xl font-semibold text-ink">Nenhuma empresa selecionada</h3>
-              <p className="mt-3 max-w-md text-sm text-ink/65">
-                Selecione uma empresa para configurar a API key e o modelo Gemini usados no relatório de vendas.
-              </p>
-            </div>
-          )}
-        </div>
+        <AiSettingsSection companies={companies} selectedCompany={selectedCompany} />
       ) : (
         <div className="grid gap-6 xl:grid-cols-[360px_1fr]">
           <article className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-card md:p-7">

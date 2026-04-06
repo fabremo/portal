@@ -1,6 +1,7 @@
 export type CompanyAiSettingsStatus = {
   companyId: string;
   hasApiKey: boolean;
+  isEnabled: boolean;
   isConfigured: boolean;
   model: string | null;
   provider: string | null;
@@ -8,8 +9,9 @@ export type CompanyAiSettingsStatus = {
 };
 
 export type CompanyAiSettingsRecord = {
-  apiKey: string;
+  apiKey: string | null;
   companyId: string;
+  isEnabled: boolean;
   model: string;
   provider: string;
 };

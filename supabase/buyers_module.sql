@@ -414,10 +414,17 @@ create table if not exists public.company_ai_settings (
   company_id uuid not null references public.companies(id) on delete cascade unique,
   provider text not null default 'gemini',
   model text not null,
-  api_key text not null,
+  api_key text,
+  is_enabled boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.company_ai_settings
+add column if not exists is_enabled boolean not null default true;
+
+alter table public.company_ai_settings
+alter column api_key drop not null;
 
 create index if not exists idx_company_ai_settings_company_id
   on public.company_ai_settings (company_id);

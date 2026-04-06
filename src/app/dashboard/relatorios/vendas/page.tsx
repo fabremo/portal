@@ -29,6 +29,7 @@ export default async function SalesReportPage() {
     <SalesReportContent
       activeAdAccountName={accessContext.activeAdAccount.name}
       adAccountId={accessContext.activeAdAccount.id}
+      activeCompanyId={accessContext.activeCompanyId}
       companyAiStatus={companyAiStatus}
       initialReport={initialReport}
       key={accessContext.activeAdAccount.id}
